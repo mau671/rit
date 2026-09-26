@@ -1,0 +1,75 @@
+[project]
+name = "aranador"
+version = "0.1.0"
+description = "Arañador web para recuperar textos del dominio audiovisual del curso IC-8060"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.9.0",
+    "python-dotenv>=1.0,<2",
+    "scrapy>=2.13,<3",
+    "trafilatura>=2.0,<3",
+]
+
+[project.scripts]
+"arañador" = "arañador.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.6.0",
+    "ty>=0.0.83",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.uv.build-backend]
+module-name = ["arañador"]
+module-root = ""
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["."]
+
+[tool.ruff.lint]
+select = [
+    "E",   # Errores y estilo básico de pycodestyle.
+    "F",   # Errores de Pyflakes.
+    "I",   # Orden e importación de módulos.
+    "UP",  # Modernizaciones disponibles desde Python 3.12.
+    "B",   # Errores comunes detectados por flake8-bugbear.
+    "SIM", # Simplificaciones seguras y legibles.
+]
+# El formateador no puede partir todos los enlaces ni texto de docstrings.
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["arañador"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+
+[tool.ty.environment]
+python-version = "3.12"
+root = ["."]
+
+[tool.ty.src]
+include = ["arañador", "tests"]
+
+[tool.ty.rules]
+possibly-missing-attribute = "error"
+unresolved-import = "error"
+
+[tool.pytest.ini_options]
+minversion = "8.3"
+testpaths = ["tests"]
+addopts = ["--strict-config", "--strict-markers"]

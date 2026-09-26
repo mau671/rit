@@ -1,0 +1,61 @@
+# Entornos y artefactos de construcción
+.venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Bytecode y código nativo
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# Cachés y resultados de herramientas
+.pytest_cache/
+.ruff_cache/
+.ty_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Configuración local y secretos
+.env
+.env.*
+!.env.example
+
+# Datos locales de la cosecha y métricas; el código de arañador sí se versiona
+/almacenamiento/
+/bitacoras/
+/datos/
+/resultados/
+/salidas/
+/arañador/.env
+/arañador/almacenamiento/
+/arañador/almacenamiento/repositorio/
+/arañador/bitacoras/
+/arañador/datos/
+/arañador/resultados/
+/arañador/salidas/
+.scrapy/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Resultados de análisis
+grafica_ley_zipf.png
+tabla_estadisticas.tex
+
+# Archivos generados por editores
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store

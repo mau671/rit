@@ -1,0 +1,38 @@
+# Entornos y herramientas
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ty_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Configuración local
+.env
+.env.*
+!.env.example
+
+# Datos descargados, bases y resultados
+almacenamiento/
+bitacoras/
+datos/
+resultados/
+salidas/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Artefactos
+build/
+dist/
+*.egg-info/
+
+# Sistema
+.DS_Store
+*.swp
+*~

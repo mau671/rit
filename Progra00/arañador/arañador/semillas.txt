@@ -1,0 +1,26 @@
+# Semillas del arañador audiovisual (IC-8060).
+#
+# Formato: una URL HTTP(S) absoluta por línea. Se permiten líneas vacías y
+# comentarios que empiezan con «#», incluso al final de una URL.
+#
+# Este archivo es la única fuente de las URL de inicio y de los hosts
+# permitidos: la araña no declara ningún dominio en el código.
+#
+# El conjunto inicial cubre guiones completos, transcripciones, tropos, fichas,
+# enciclopedia, reseñas y ensayos sobre producciones audiovisuales.
+
+https://imsdb.com/all-scripts.html
+https://www.dailyscript.com/movie.html
+https://www.simplyscripts.com/movie-scripts.html
+https://subslikescript.com/movies
+https://subslikescript.com/series
+https://tvtropes.org/pmwiki/pmwiki.php/Main/Film
+https://tvtropes.org/pmwiki/pmwiki.php/Main/Anime
+https://www.filmaffinity.com/es/cat_new_th_es.html
+https://www.tvmaze.com/shows
+https://www.animenewsnetwork.com/encyclopedia/
+https://es.wikipedia.org/wiki/Portal:Cine
+https://es.wikipedia.org/wiki/Categor%C3%ADa:Series_de_anime
+https://www.sensesofcinema.com/
+https://es.wikipedia.org/wiki/Categor%C3%ADa:Pel%C3%ADculas_de_ciencia_ficci%C3%B3n
+https://tvtropes.org/pmwiki/pmwiki.php/Main/Plots
