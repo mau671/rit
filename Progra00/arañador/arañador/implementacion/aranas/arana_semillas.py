@@ -194,9 +194,46 @@ class AranaSemillas(Spider):
         if not self.es_url_permitida(response.url):
             self._advertir_respuesta_omitida(response.url)
             return
-        if 200 <= response.status < 300:
+
+        directivas_robots = self._extraer_directivas_robots(response)
+
+        # Política de cortesía inline: noindex prohíbe almacenar el documento.
+        if (
+            200 <= response.status < 300
+            and "noindex" not in directivas_robots
+            and "none" not in directivas_robots
+        ):
             yield self._crear_documento(response)
-        yield from self._seguir_enlaces(response)
+
+        # Política de cortesía inline: nofollow prohíbe seguir enlaces de la página.
+        if "nofollow" not in directivas_robots and "none" not in directivas_robots:
+            yield from self._seguir_enlaces(response)
+
+    def _extraer_directivas_robots(self, response: TextResponse) -> set[str]:
+        """Extrae directivas de robots inline (<meta name="robots"> y X-Robots-Tag)."""
+
+        directivas: set[str] = set()
+        meta_robots = self._meta_contenido(response, "robots")
+        if meta_robots:
+            for directiva in meta_robots.replace(";", ",").split(","):
+                limpia = directiva.strip().casefold()
+                if limpia:
+                    directivas.add(limpia)
+
+        if hasattr(response, "headers") and response.headers:
+            x_robots = response.headers.get("X-Robots-Tag")
+            if x_robots:
+                texto_x_robots = (
+                    x_robots.decode("utf-8", errors="replace")
+                    if isinstance(x_robots, bytes)
+                    else str(x_robots)
+                )
+                for directiva in texto_x_robots.replace(";", ",").split(","):
+                    limpia = directiva.strip().casefold()
+                    if limpia:
+                        directivas.add(limpia)
+
+        return directivas
 
     def es_url_permitida(self, url: str) -> bool:
         """Indica si una URL pertenece a los hosts derivados y no es binaria.

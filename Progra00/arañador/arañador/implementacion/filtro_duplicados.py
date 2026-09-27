@@ -21,8 +21,9 @@ class FiltroDuplicadosPersistentes(RFPDupeFilter):
     La deduplicación en memoria de Scrapy continúa siendo la primera capa para
     una misma ejecución. La segunda capa consulta el hash de la
     URL normalizada: omite el documento si su próxima relectura es futura y lo
-    permite cuando no existe o ya venció. Las URLs más superficiales reciben una
-    prioridad numérica menor, por lo que la cola las procesa antes.
+    permite cuando no existe o ya venció. Las URLs más superficiales conservan
+    una mayor prioridad relativa en Scrapy, por lo que la cola las procesa antes
+    (estrategia de recorrido en amplitud / BFS).
     """
 
     def __init__(
@@ -81,7 +82,7 @@ class FiltroDuplicadosPersistentes(RFPDupeFilter):
 
         profundidad = request.meta.get("depth", 0)
         if isinstance(profundidad, int) and not isinstance(profundidad, bool) and profundidad >= 0:
-            request.priority += profundidad * 10
+            request.priority -= profundidad * 10
 
         hash_url = generar_hash_url(request.url)
         if not repositorio.necesita_revisita(hash_url):

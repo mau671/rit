@@ -28,6 +28,7 @@ from arañador.implementacion.aranas import (
 from arañador.implementacion.bd import RepositorioBitacora
 from arañador.implementacion.configuracion import ConfiguracionAranador, obtener_ruta_base_datos
 from arañador.implementacion.elementos import DocumentoItem
+from arañador.implementacion.filtro_duplicados import FiltroDuplicadosPersistentes
 from arañador.implementacion.intermediarios import IntermediarioBitacora
 
 # Las quince URL del plan, en el orden declarado en ``arañador/semillas.txt``.
@@ -535,3 +536,81 @@ def test_timeout_de_bitacora_se_refleja_en_busy_timeout(tmp_path: Path) -> None:
         assert repositorio._conexion.busy_timeout_ms == 125
     finally:
         middleware.cerrar()
+
+
+def test_arana_respeta_directivas_inline_noindex_y_nofollow() -> None:
+    """La araña respeta <meta name='robots'> para omitir documentos o enlaces salientes."""
+
+    araña = AranaSemillas(
+        start_urls=["https://sitio.test/inicio"],
+        allowed_domains=["sitio.test"],
+    )
+
+    # 1. noindex: no produce DocumentoItem, pero sí sigue enlaces
+    cuerpo_noindex = """
+    <html><head>
+      <meta name="robots" content="noindex, follow" />
+    </head><body>
+      <h1>Página no indexable</h1>
+      <a href="https://sitio.test/siguiente">Enlace permitido</a>
+    </body></html>
+    """
+    resp_noindex = respuesta_html(
+        "https://sitio.test/noindex", cuerpo=cuerpo_noindex, profundidad=1
+    )
+    res_noindex = list(araña.parse(resp_noindex))
+    assert not any(isinstance(r, DocumentoItem) for r in res_noindex)
+    assert any(
+        isinstance(r, Request) and r.url == "https://sitio.test/siguiente" for r in res_noindex
+    )
+
+    # 2. nofollow: produce DocumentoItem, pero no sigue enlaces
+    cuerpo_nofollow = """
+    <html><head>
+      <meta name="robots" content="nofollow" />
+    </head><body>
+      <h1>Página con enlaces no permitidos</h1>
+      <a href="https://sitio.test/no-seguir">Enlace no seguido</a>
+    </body></html>
+    """
+    resp_nofollow = respuesta_html(
+        "https://sitio.test/nofollow", cuerpo=cuerpo_nofollow, profundidad=1
+    )
+    res_nofollow = list(araña.parse(resp_nofollow))
+    assert any(isinstance(r, DocumentoItem) for r in res_nofollow)
+    assert not any(isinstance(r, Request) for r in res_nofollow)
+
+    # 3. none (noindex, nofollow): no produce ítem ni solicitudes
+    cuerpo_none = """
+    <html><head>
+      <meta name="robots" content="none" />
+    </head><body>
+      <a href="https://sitio.test/bloqueado">Bloqueado</a>
+    </body></html>
+    """
+    resp_none = respuesta_html("https://sitio.test/none", cuerpo=cuerpo_none, profundidad=1)
+    res_none = list(araña.parse(resp_none))
+    assert len(res_none) == 0
+
+
+def test_filtro_duplicados_asigna_prioridad_bfs_segun_profundidad(tmp_path: Path) -> None:
+    """Las URLs más superficiales conservan mayor prioridad para estrategia BFS."""
+
+    filtro = FiltroDuplicadosPersistentes(tmp_path / "filtro.db")
+    filtro.open()
+    try:
+        req_d0 = Request("https://sitio.test/p0", meta={"depth": 0}, priority=0)
+        req_d1 = Request("https://sitio.test/p1", meta={"depth": 1}, priority=0)
+        req_d2 = Request("https://sitio.test/p2", meta={"depth": 2}, priority=0)
+
+        filtro.request_seen(req_d0)
+        filtro.request_seen(req_d1)
+        filtro.request_seen(req_d2)
+
+        # En Scrapy mayor prioridad se procesa primero: d0 > d1 > d2
+        assert req_d0.priority > req_d1.priority > req_d2.priority
+        assert req_d0.priority == 0
+        assert req_d1.priority == -10
+        assert req_d2.priority == -20
+    finally:
+        filtro.close("finished")

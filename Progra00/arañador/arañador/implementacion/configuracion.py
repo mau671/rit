@@ -80,15 +80,15 @@ def _obtener_nivel_log() -> str:
 def _obtener_user_agent() -> str:
     """Devuelve un User-Agent configurable sin incluir credenciales reales.
 
-    ``USER_AGENT`` permite definir la identificación de la ejecución. El
-    valor predeterminado es un User-Agent de navegador para los sitios que no
-    distinguen crawlers; la responsabilidad de uso sigue siendo del operador.
+    ``USER_AGENT`` permite definir la identificación de la ejecución. Por
+    defecto se identifica como un robot académico respetuoso del curso RIT/IC-8060
+    de conformidad con las recomendaciones de diseño y cortesía.
     """
 
     configurado = leer_texto("USER_AGENT")
     if configurado:
         return " ".join(configurado.split())
-    return "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
+    return "AranadorAudiovisualBot/1.0 (+https://tec.ac.cr/ic8060)"
 
 
 class ConfiguracionAranador:
