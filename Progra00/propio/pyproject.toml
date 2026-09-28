@@ -1,0 +1,43 @@
+[project]
+name = "propio"
+version = "0.1.0"
+description = "Arañador propio (solo biblioteca estándar) del dominio audiovisual, curso IC-8060"
+readme = "README.md"
+requires-python = ">=3.12"
+# Sin dependencias a propósito: HTTP, HTML, robots.txt, hilos y SQLite se
+# resuelven con la biblioteca estándar de Python.
+dependencies = []
+
+[project.scripts]
+propio = "propio.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.6.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.uv.build-backend]
+module-name = ["propio"]
+module-root = ""
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+minversion = "8.3"
+testpaths = ["tests"]
+addopts = ["--strict-config", "--strict-markers"]
