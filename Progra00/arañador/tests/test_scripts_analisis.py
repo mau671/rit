@@ -136,6 +136,75 @@ def test_zipf_rechaza_corpus_vacio(tmp_path: Path) -> None:
         ejecutar_analisis(corpus, tmp_path / "salida")
 
 
+def _crear_corpus_zipf(base: Path, documentos: int = 12) -> Path:
+    """Crea un corpus pequeño y variado para las pruebas de conteo Zipf."""
+    corpus = base / "corpus_zipf"
+    corpus.mkdir()
+    for indice in range(documentos):
+        contenido = f"casa gato perro acción ñandú don't numero{indice % 3}\n" * (indice + 1)
+        (corpus / f"documento{indice:02d}.txt").write_text(contenido, encoding="utf-8")
+    return corpus
+
+
+def test_zipf_multiproceso_coincide_con_secuencial(tmp_path: Path) -> None:
+    """El conteo en paralelo produce exactamente el mismo resultado que el secuencial."""
+    corpus = _crear_corpus_zipf(tmp_path)
+
+    secuencial = analizar_corpus(corpus, limite_top=50, trabajadores=1)
+    paralelo = analizar_corpus(corpus, limite_top=50, trabajadores=2)
+
+    assert paralelo.total_palabras == secuencial.total_palabras
+    assert paralelo.vocabulario == secuencial.vocabulario
+    assert paralelo.constante_c == secuencial.constante_c
+    assert paralelo.documentos == secuencial.documentos
+    assert paralelo.bytes_totales == secuencial.bytes_totales
+    assert paralelo.frecuencias == secuencial.frecuencias
+
+
+def test_zipf_progreso_reporta_totales(tmp_path: Path) -> None:
+    """El callback de progreso termina con procesados igual al total y bytes leídos."""
+    corpus = _crear_corpus_zipf(tmp_path, documentos=4)
+    llamadas: list[tuple[int, int, int]] = []
+
+    resultado = analizar_corpus(
+        corpus,
+        limite_top=10,
+        trabajadores=2,
+        progreso=lambda procesados, total, bytes_leidos: llamadas.append(
+            (procesados, total, bytes_leidos)
+        ),
+    )
+
+    assert llamadas
+    procesados, total, bytes_leidos = llamadas[-1]
+    assert procesados == total == resultado.documentos
+    assert bytes_leidos > 0
+
+
+def test_zipf_cache_reutiliza_conteo(tmp_path: Path) -> None:
+    """La segunda corrida con caché reutiliza el conteo y no vuelve a tokenizar."""
+    pytest.importorskip("arañador.guiones.zipf_cache")
+    corpus = _crear_corpus_zipf(tmp_path, documentos=5)
+    cache = tmp_path / "zipf.sqlite"
+
+    primero = analizar_corpus(corpus, limite_top=20, trabajadores=1, cache=cache)
+    assert cache.is_file()
+
+    llamadas: list[tuple[int, int, int]] = []
+    segundo = analizar_corpus(
+        corpus,
+        limite_top=20,
+        trabajadores=1,
+        cache=cache,
+        progreso=lambda procesados, total, bytes_leidos: llamadas.append(
+            (procesados, total, bytes_leidos)
+        ),
+    )
+
+    assert segundo == primero
+    assert llamadas == []
+
+
 def test_monitoreo_consulta_solo_lectura_y_calcula_velocidad(tmp_path: Path) -> None:
     """Concilia bytes de disco, dominios y velocidad media sin escribir la base."""
     base = tmp_path / "datos.db"
