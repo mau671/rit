@@ -1,7 +1,7 @@
 """Araña única y agnóstica del arañador audiovisual.
 
-La araña no conoce ningún sitio: toma sus URL de inicio de
-``arañador/semillas.txt``, deriva de ellas los hosts permitidos y recorre los
+La araña no conoce ningún sitio: toma sus URL de inicio del archivo de semillas
+compartido ``Progra00/semillas.txt``, deriva de ellas los hosts permitidos y recorre los
 enlaces internos con un ``LinkExtractor`` genérico. No hay patrones,
 selectores ni expresiones regulares por dominio: la clasificación temática y la
 limpieza del texto ocurren más adelante, en las tuberías de Scrapy.
@@ -10,7 +10,7 @@ limpieza del texto ocurren más adelante, en las tuberías de Scrapy.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Generator, Iterable
-from importlib import resources
+from pathlib import Path
 from typing import Any, Final
 from urllib.parse import unquote, urldefrag, urlsplit
 
@@ -19,6 +19,7 @@ from scrapy.http import Response, TextResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy.settings import BaseSettings
 
+from arañador.entorno import RAIZ_PROYECTO, leer_texto
 from arañador.implementacion.aranas.arana_base import (
     CATEGORIA_DOCUMENTOS,
     DocumentoItemAranador,
@@ -31,11 +32,33 @@ from arañador.implementacion.utilidades.normalizador_url import (
     obtener_host_origen,
 )
 
-#: Nombre del recurso de datos con las URL semilla, junto a ``arañador/__init__``.
+#: Nombre canónico del archivo de semillas compartido por ambas implementaciones.
 NOMBRE_SEMILLAS: Final[str] = "semillas.txt"
+
+#: Ruta por defecto de las semillas, relativa a la raíz del proyecto (``Progra00/``).
+SEMILLAS_POR_DEFECTO: Final[str] = "../semillas.txt"
 
 #: Esquemas admitidos tanto en las semillas como en los enlaces recorridos.
 ESQUEMAS_PERMITIDOS: Final[frozenset[str]] = frozenset({"http", "https"})
+
+
+def _resolver_ruta_semillas() -> Path:
+    """Resuelve el archivo de semillas configurado en ``SEMILLAS``.
+
+    Las rutas relativas se resuelven contra la raíz del proyecto, no contra el
+    directorio de trabajo, para que el resultado no dependa de desde dónde se
+    invoque el arañador.
+    """
+
+    configurada = leer_texto("SEMILLAS", SEMILLAS_POR_DEFECTO)
+    ruta = Path(configurada).expanduser()
+    if not ruta.is_absolute():
+        ruta = RAIZ_PROYECTO / ruta
+    return ruta.resolve(strict=False)
+
+
+#: Ruta efectiva del archivo de semillas compartido.
+RUTA_SEMILLAS: Final[Path] = _resolver_ruta_semillas()
 
 
 def interpretar_semillas(contenido: str) -> tuple[str, ...]:
@@ -69,23 +92,31 @@ def interpretar_semillas(contenido: str) -> tuple[str, ...]:
     return tuple(semillas)
 
 
-def cargar_semillas() -> tuple[str, ...]:
-    """Lee las URL semilla del paquete instalado, editable o en wheel.
+def cargar_semillas(ruta: str | Path | None = None) -> tuple[str, ...]:
+    """Lee las URL semilla del archivo compartido ``Progra00/semillas.txt``.
 
-    Se usa :func:`importlib.resources.files` para que la ruta se resuelva
-    dentro del paquete y no dependa del directorio de trabajo.
+    La ruta se toma del parámetro ``ruta``, o de la variable ``SEMILLAS`` del
+    ``.env``, o del valor por defecto ``../semillas.txt`` relativo a la raíz del
+    proyecto. Al vivir fuera de cada paquete, las dos implementaciones usan el
+    mismo archivo.
+
+    Args:
+        ruta: Ruta explícita al archivo de semillas; si se omite, se usa la
+            configurada en ``SEMILLAS``.
 
     Returns:
-        Las URL semilla declaradas en ``arañador/semillas.txt``.
+        Las URL semilla declaradas en el archivo, sin duplicados y en orden.
 
     Raises:
-        ValueError: Si el archivo no declara ninguna URL semilla válida.
+        ValueError: Si el archivo no existe o no declara ninguna URL semilla válida.
     """
 
-    recurso = resources.files("arañador") / NOMBRE_SEMILLAS
-    semillas = interpretar_semillas(recurso.read_text(encoding="utf-8"))
+    archivo = Path(ruta).expanduser() if ruta is not None else RUTA_SEMILLAS
+    if not archivo.is_file():
+        raise ValueError(f"no se encontró el archivo de semillas '{archivo}'")
+    semillas = interpretar_semillas(archivo.read_text(encoding="utf-8"))
     if not semillas:
-        raise ValueError(f"{NOMBRE_SEMILLAS} no declara ninguna URL semilla")
+        raise ValueError(f"{archivo.name} no declara ninguna URL semilla")
     return semillas
 
 

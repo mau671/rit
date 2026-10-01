@@ -56,14 +56,14 @@ def resolver_ruta(valor: str) -> Path:
 cargar_env()
 
 # --- Rutas de datos (misma estructura que la versión con Scrapy) -------------
-RAIZ_DATOS: Path = resolver_ruta(leer_texto("RAIZ_DATOS", "."))
+RAIZ_DATOS: Path = resolver_ruta(leer_texto("RAIZ_DATOS", ".."))
 RUTA_BASE_DATOS: Path = RAIZ_DATOS / "almacenamiento" / "metadatos_araña.db"
 RUTA_REPOSITORIO: Path = RAIZ_DATOS / "almacenamiento" / "repositorio"
 RUTA_LOG: Path = resolver_ruta(leer_texto("LOG_FILE", "bitacoras/recorrido.log"))
 NIVEL_LOG: str = leer_texto("LOG_LEVEL", "INFO").upper()
 
 # Semillas compartidas: una sola fuente de verdad para ambas arañas.
-RUTA_SEMILLAS: Path = resolver_ruta(leer_texto("SEMILLAS", "../arañador/arañador/semillas.txt"))
+RUTA_SEMILLAS: Path = resolver_ruta(leer_texto("SEMILLAS", "../semillas.txt"))
 
 # --- Política de identificación (cortesía) ----------------------------------
 USER_AGENT: str = " ".join(
