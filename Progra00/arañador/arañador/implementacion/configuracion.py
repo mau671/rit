@@ -70,11 +70,15 @@ def obtener_ruta_repositorio(settings: Any) -> str:
 
 
 def _obtener_nivel_log() -> str:
-    """Normaliza el nivel de log y usa ``INFO`` para valores desconocidos."""
+    """Normaliza el nivel de log y usa ``WARNING`` para valores desconocidos.
 
-    nivel = leer_texto("LOG_LEVEL", "INFO").upper()
+    El detalle por intento vive en la tabla ``bitacora_recorrido``; el log de
+    texto se mantiene en ``WARNING`` para no crecer con una línea por petición.
+    """
+
+    nivel = leer_texto("LOG_LEVEL", "WARNING").upper()
     permitidos = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "FATAL"}
-    return nivel if nivel in permitidos else "INFO"
+    return nivel if nivel in permitidos else "WARNING"
 
 
 def _obtener_user_agent() -> str:

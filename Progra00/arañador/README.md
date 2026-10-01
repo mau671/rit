@@ -105,7 +105,7 @@ El proyecto carga sus variables desde el archivo `.env`. El archivo incluye valo
 RAIZ_DATOS=..
 USER_AGENT="AranadorAudiovisualBot/1.0 (+https://tec.ac.cr/ic8060)"
 SEMILLAS=../semillas.txt
-LOG_LEVEL=INFO
+LOG_LEVEL=WARNING
 LOG_FILE=bitacoras/cosecha.log
 INTERVALO_PROGRESO=15
 OBJETIVO_GIB=10
