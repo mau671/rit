@@ -118,7 +118,7 @@ Para iniciar la recolección con visualización de progreso cada 15 segundos:
 ```bash
 uv run arañador
 ```
-Si el proceso se interrumpe con la combinación de teclas Control y C, es posible reanudarlo ejecutando el mismo comando. El estado se conserva mediante la cola en disco y el filtro persistente de la base de datos.
+Si el proceso se interrumpe con la combinación de teclas Control y C, es posible reanudarlo ejecutando el mismo comando. La cola de URLs pendientes ahora es la tabla `frontera` de la base compartida `Progra00/almacenamiento/metadatos_araña.db`, ordenada en amplitud (menor `profundidad` primero) y con FIFO dentro del mismo nivel. Al arrancar, la araña reconcilia esa frontera: descarta lo que ya está fresco en `documentos` y encola el resto; al terminar cada URL la marca como `visitada` y los errores se cuentan en `intentos` hasta un tope. `JOBDIR` deja de usarse como cola, de modo que se puede alternar con la implementación propia sobre la misma frontera sin volver a descargar lo ya guardado.
 
 ### 4.5. Generación del informe estadístico y curva de Zipf
 Al finalizar la cosecha o al alcanzar el volumen deseado:

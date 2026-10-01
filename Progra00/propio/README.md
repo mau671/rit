@@ -15,7 +15,7 @@ cp .env.example .env
 uv sync
 uv run propio verificar      # revisa semillas, hosts y base
 uv run propio                # cosecha; Ctrl+C para detener
-uv run propio                # otra vez: reanuda desde Progra00/almacenamiento/frontera.jsonl
+uv run propio                # otra vez: reanuda desde la tabla frontera compartida
 tail -f bitacoras/recorrido.log
 uv run pytest
 ```
@@ -63,10 +63,40 @@ lo que el árbol de repositorio es idéntico.
 
 Eso permite correr primero una implementación y luego la otra: cada una detecta
 por `hash_url`/`hash_contenido` y `fecha_revisitacion` lo ya descargado por la
-otra y no lo duplica. La única parte que no se comparte es la frontera de URLs
-pendientes (el `JOBDIR` de Scrapy frente al `Progra00/almacenamiento/frontera.jsonl`
-de esta versión), de modo que al cambiar de implementación se reanuda desde las
-semillas y la deduplicación persistente evita volver a descargar lo que ya está.
+otra y no lo duplica.
+
+## Frontera compartida y reanudación
+
+La cola de URLs pendientes ya no vive en un archivo por implementación: es la
+tabla `frontera` de la base compartida
+`Progra00/almacenamiento/metadatos_araña.db`, de modo que ambas arañas trabajan
+sobre la misma cola.
+
+| Columna | Contenido |
+|---|---|
+| `hash_url` | Clave: SHA-256 de la URL canónica |
+| `url` | URL pendiente |
+| `profundidad` | Saltos de enlace desde la semilla |
+| `prioridad` | `-profundidad`, para el recorrido en amplitud (BFS) |
+| `url_origen` | Página desde la que se descubrió |
+| `estado` | `pendiente`, `visitada` o `error` |
+| `intentos` | Reintentos acumulados de una URL con error |
+| `actualizada_en` | Última actualización de la fila |
+
+La cola se atiende en anchura, de menor a mayor `profundidad`, y con FIFO entre
+URLs del mismo nivel. Al arrancar, cada implementación **reconcilia** la
+frontera: descarta lo que ya está fresco en `documentos` y encola el resto. Al
+descubrir enlaces los registra, al terminar de procesarlos los marca
+`visitada`, y los errores se cuentan en `intentos` hasta un tope.
+
+Como la clave es `hash_url` y la frescura se consulta en la base compartida, se
+puede ejecutar `uv run arañador` y luego `uv run propio` (o al revés) y la
+segunda continúa la misma cola, sin volver a descargar lo ya guardado. Esta
+versión ya no usa `frontera.jsonl` como cola persistente.
+
+Límite conocido: una URL que se descarga y se descarta (por baja densidad u
+otro filtro) queda como `visitada`, mientras que las URLs que fallan tras agotar
+los reintentos pueden reintentarse en una corrida futura.
 
 El informe es único, pues su resultado es el mismo sin importar qué
 implementación descargó, y se genera con la versión de Scrapy sobre el
