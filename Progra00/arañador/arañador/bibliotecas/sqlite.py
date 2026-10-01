@@ -119,7 +119,37 @@ MIGRACION_INICIAL: Final[Migracion] = Migracion(
     ),
 )
 
-MIGRACIONES: Final[tuple[Migracion, ...]] = (MIGRACION_INICIAL,)
+# La segunda migración es aditiva: crea la frontera compartida (cola de URL
+# pendientes) que ambas implementaciones del proyecto usan sobre el mismo
+# archivo.  El DDL es un contrato congelado; no se modifica en sitio.
+MIGRACION_FRONTERA: Final[Migracion] = Migracion(
+    numero=2,
+    nombre="frontera_compartida",
+    sentencias=(
+        """
+        CREATE TABLE IF NOT EXISTS frontera (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            hash_url       TEXT NOT NULL UNIQUE,
+            url            TEXT NOT NULL,
+            profundidad    INTEGER NOT NULL,
+            prioridad      REAL NOT NULL,
+            url_origen     TEXT,
+            estado         TEXT NOT NULL DEFAULT 'pendiente',
+            intentos       INTEGER NOT NULL DEFAULT 0,
+            actualizada_en TIMESTAMP NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+            CHECK (profundidad >= 0),
+            CHECK (intentos >= 0),
+            CHECK (estado IN ('pendiente', 'visitada', 'error'))
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS idx_frontera_cola
+            ON frontera(estado, prioridad DESC, id ASC)
+        """,
+    ),
+)
+
+MIGRACIONES: Final[tuple[Migracion, ...]] = (MIGRACION_INICIAL, MIGRACION_FRONTERA)
 """Migraciones conocidas, ordenadas por número."""
 
 
@@ -712,6 +742,7 @@ Conexion = ConexionSQLite
 __all__ = [
     "Conexion",
     "ConexionSQLite",
+    "MIGRACION_FRONTERA",
     "MIGRACION_INICIAL",
     "MIGRACIONES",
     "Migracion",

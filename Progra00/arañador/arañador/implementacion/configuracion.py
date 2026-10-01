@@ -198,10 +198,19 @@ class ConfiguracionAranador:
     AUTOTHROTTLE_TARGET_CONCURRENCY = 2.0
     AUTOTHROTTLE_DEBUG_DELAY = 1.0
 
-    # Cola de solicitudes persistente: al reiniciar, Scrapy recupera el frente
-    # pendiente en lugar de perderlo al cerrar el proceso.
-    JOBDIR = str(resolver_ruta_datos("almacenamiento", ".scrapy-job"))
-    SCHEDULER_PERSIST = True
+    # La frontera (cola de URL pendientes) vive en la base SQLite compartida y
+    # no en la cola propia de Scrapy: se desactivan JOBDIR y la persistencia del
+    # planificador para no tener dos fuentes de verdad. La extensión y el
+    # middleware de frontera conservan el avance entre ejecuciones.
+    SCHEDULER_PERSIST = False
+    EXTENSIONS = {
+        "arañador.implementacion.extensiones.frontera_compartida.ExtensionFronteraCompartida": 500,
+    }
+    SPIDER_MIDDLEWARES = {
+        "arañador.implementacion.extensiones.frontera_compartida.MiddlewareFronteraInicial": 500,
+    }
+    FRONTERA_SQLITE_TIMEOUT = 0.5
+    FRONTERA_MAX_INTENTOS = 3
 
     # Deduplicación en memoria más filtro persistente de frescura. La segunda
     # capa consulta SQLite antes de descargar una URL ya procesada.

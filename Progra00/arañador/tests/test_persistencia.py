@@ -49,7 +49,7 @@ def test_esquema_wal_claves_y_migracion_idempotente(tmp_path: Path) -> None:
         assert conexion.modo_journal == "wal"
         assert conexion.foreign_keys_activas is True
         assert conexion.busy_timeout_ms == 5_000
-        assert conexion.version_esquema == 1
+        assert conexion.version_esquema == 2
         assert conexion.esta_inicializada() is True
         assert conexion.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
         assert conexion.execute("PRAGMA busy_timeout").fetchone()[0] == 5_000
@@ -63,22 +63,22 @@ def test_esquema_wal_claves_y_migracion_idempotente(tmp_path: Path) -> None:
 
         primera = conexion.inicializar()
         segunda = conexion.inicializar()
-        assert primera == segunda == 1
+        assert primera == segunda == 2
         aplicadas = conexion.fetchone("SELECT COUNT(*) AS n FROM schema_migrations")
         assert aplicadas is not None
-        assert aplicadas["n"] == 1
+        assert aplicadas["n"] == 2
 
 
 def test_no_reduce_un_esquema_desconocido(tmp_path: Path) -> None:
     """Una base creada por una versión más nueva no se degrada al abrirla."""
 
     with ConexionSQLite(tmp_path / "futuro.db") as conexion:
-        conexion.execute("PRAGMA user_version = 2")
+        conexion.execute("PRAGMA user_version = 3")
 
         with pytest.raises(sqlite3.OperationalError, match="más reciente"):
             conexion.inicializar()
 
-        assert conexion.version_esquema == 2
+        assert conexion.version_esquema == 3
 
 
 def test_deduplicacion_de_url_y_contenido_es_atomica(tmp_path: Path) -> None:

@@ -157,14 +157,19 @@ def test_configuracion_cumple_las_politicas_principales() -> None:
     assert ConfiguracionAranador.RETRY_TIMES >= 1
     assert ConfiguracionAranador.DOWNLOAD_TIMEOUT > 0
     assert ConfiguracionAranador.REDIRECT_ENABLED is True
-    assert ConfiguracionAranador.SCHEDULER_PERSIST is True
-    assert "scrapy-job" in str(ConfiguracionAranador.JOBDIR)
+    # La cola propia de Scrapy se desactiva: la frontera vive en SQLite.
+    assert ConfiguracionAranador.SCHEDULER_PERSIST is False
+    assert not hasattr(ConfiguracionAranador, "JOBDIR")
     assert ".pdf" in ConfiguracionAranador.EXTENSIONES_EXCLUIDAS
 
     for ruta in ConfiguracionAranador.ITEM_PIPELINES:
         assert load_object(ruta) is not None
     for ruta in ConfiguracionAranador.DOWNLOADER_MIDDLEWARES:
         assert load_object(ruta) is IntermediarioBitacora
+    for ruta in ConfiguracionAranador.EXTENSIONS:
+        assert load_object(ruta) is not None
+    for ruta in ConfiguracionAranador.SPIDER_MIDDLEWARES:
+        assert load_object(ruta) is not None
 
 
 def test_la_araña_refuerza_robots_y_limites_generales() -> None:

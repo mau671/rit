@@ -1,6 +1,7 @@
 """API pública de la capa de persistencia del arañador audiovisual."""
 
 from ...bibliotecas.sqlite import (
+    MIGRACION_FRONTERA,
     MIGRACION_INICIAL,
     MIGRACIONES,
     RUTA_POR_DEFECTO,
@@ -8,6 +9,10 @@ from ...bibliotecas.sqlite import (
     Conexion,
     ConexionSQLite,
     Migracion,
+)
+from .frontera import (
+    EntradaFrontera,
+    RepositorioFrontera,
 )
 from .modelos import (
     MetadatoDocumento,
@@ -30,8 +35,10 @@ __all__ = [
     "Conexion",
     "ConexionSQLite",
     "DocumentoDuplicadoError",
+    "EntradaFrontera",
     "FabricaConexion",
     "MIGRACIONES",
+    "MIGRACION_FRONTERA",
     "MIGRACION_INICIAL",
     "MetadatoDocumento",
     "Migracion",
@@ -39,6 +46,7 @@ __all__ = [
     "RegistroBitacora",
     "RepositorioBitacora",
     "RepositorioDocumentos",
+    "RepositorioFrontera",
     "ResultadoInsercion",
     "ResultadoLoteDocumentos",
     "TIEMPO_ESPERA_POR_DEFECTO_MS",

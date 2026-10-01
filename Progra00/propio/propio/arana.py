@@ -15,7 +15,6 @@ Ciclo de cada hilo trabajador:
 from __future__ import annotations
 
 import itertools
-import json
 import logging
 import os
 import queue
@@ -62,7 +61,6 @@ class Arana:
         repositorio: Path = RUTA_REPOSITORIO,
         hilos: int = HILOS,
         objetivo_bytes: int = OBJETIVO_BYTES,
-        archivo_frontera: Path | None = None,
     ) -> None:
         self.semillas = tuple(semillas)
         self.hosts = derivar_hosts(self.semillas)
@@ -71,7 +69,6 @@ class Arana:
         self.repositorio = Path(repositorio)
         self.hilos = hilos
         self.objetivo_bytes = objetivo_bytes
-        self.archivo_frontera = archivo_frontera or self.repositorio.parent / "frontera.jsonl"
 
         self.frontera: queue.PriorityQueue[Entrada] = queue.PriorityQueue()
         self._orden = itertools.count()
@@ -108,6 +105,8 @@ class Arana:
 
         ``forzar`` se usa con las semillas: siempre se piden para redescubrir
         enlaces, aunque ya estén guardadas (igual que ``dont_filter`` en Scrapy).
+        La URL se registra además en la tabla ``frontera`` compartida con la
+        versión con Scrapy, de modo que cualquiera de las dos puede reanudar.
         """
 
         if profundidad > PROFUNDIDAD_MAXIMA or not self.url_aceptable(url):
@@ -123,6 +122,9 @@ class Arana:
         # Política de frescura: si ya está guardada y no ha vencido, no se baja.
         if not forzar and not self.bd.necesita_revisita(clave):
             return False
+        # Persistir: si ya estaba pendiente conserva su ``id`` (FIFO); si
+        # estaba visitada o en error, se resucita.
+        self.bd.frontera.registrar(url, profundidad, origen)
         with self._lock:
             self._pendientes += 1
         self.frontera.put((profundidad, next(self._orden), url, origen))
@@ -136,29 +138,24 @@ class Arana:
         with self._lock:
             return self._pendientes
 
-    # --- Frontera persistente (equivale a JOBDIR de Scrapy) ------------
-    def guardar_frontera(self) -> None:
-        """Escribe la frontera en disco para poder reanudar tras Ctrl+C."""
-
-        with self.frontera.mutex:
-            entradas = list(self.frontera.queue)
-        self.archivo_frontera.parent.mkdir(parents=True, exist_ok=True)
-        temporal = self.archivo_frontera.with_suffix(".tmp")
-        with temporal.open("w", encoding="utf-8") as archivo:
-            for profundidad, _orden, url, origen in sorted(entradas):
-                archivo.write(json.dumps([profundidad, url, origen], ensure_ascii=False) + "\n")
-        os.replace(temporal, self.archivo_frontera)
-
+    # --- Frontera persistente compartida (tabla SQLite) ----------------
     def _cargar_frontera(self) -> int:
-        if not self.archivo_frontera.is_file():
-            return 0
+        """Reanuda la frontera guardada en SQLite.
+
+        Primero descarta las URL que ya no necesitan revisita (``reconciliar``)
+        y luego encola las pendientes que siguen pasando los filtros de
+        selección, profundidad y deduplicación en memoria.
+        """
+
+        descartadas = self.bd.frontera.reconciliar(
+            lambda hash_: not self.bd.necesita_revisita(hash_)
+        )
+        if descartadas:
+            log.info("Frontera: %d URL ya frescas descartadas", descartadas)
         cargadas = 0
-        for linea in self.archivo_frontera.read_text(encoding="utf-8").splitlines():
-            try:
-                profundidad, url, origen = json.loads(linea)
-            except (ValueError, TypeError):
-                continue
-            cargadas += self.encolar(url, int(profundidad), origen)
+        for entrada in self.bd.frontera.pendientes():
+            if self.encolar(entrada.url, entrada.profundidad, entrada.url_origen):
+                cargadas += 1
         return cargadas
 
     # ------------------------------------------------------------------
@@ -185,6 +182,28 @@ class Arana:
             self._terminar_entrada()
 
     def _procesar(self, url: str, profundidad: int, origen: str | None) -> None:
+        """Procesa una URL y refleja el resultado en la frontera compartida.
+
+        * Termina normalmente -> ``visitada``.
+        * ``ErrorDescarga`` -> ``marcar_error`` (con tope de intentos).
+        * ``HostOcupado`` -> no toca la frontera: la URL sigue ``pendiente`` y
+          el hilo la reencola para tomar otra de un host libre.
+        """
+
+        try:
+            self._procesar_pagina(url, profundidad, origen)
+        except ErrorDescarga as error:
+            self.bd.frontera.marcar_error(hash_url(url))
+            self.bd.registrar_bitacora(
+                dominio=obtener_host_origen(url), url_origen=origen, url_destino=url,
+                tiempo_respuesta_ms=error.tiempo_ms, codigo_http=error.codigo_http,
+                accion=acciones.ACCION_ERROR,
+            )  # fmt: skip
+            log.info("ERROR   %s  (%s)", url, error)
+        else:
+            self.bd.frontera.marcar_visitada(hash_url(url))
+
+    def _procesar_pagina(self, url: str, profundidad: int, origen: str | None) -> None:
         dominio = obtener_host_origen(url)
 
         # 1. Cortesía: robots.txt
@@ -196,17 +215,9 @@ class Arana:
             log.info("ROBOTS  %s", url)
             return
 
-        # 2. Descarga (lanza HostOcupado si el host está lleno)
-        try:
-            respuesta = self.descargador.descargar(url, espera_maxima=1.0)
-        except ErrorDescarga as error:
-            self.bd.registrar_bitacora(
-                dominio=dominio, url_origen=origen, url_destino=url,
-                tiempo_respuesta_ms=error.tiempo_ms, codigo_http=error.codigo_http,
-                accion=acciones.ACCION_ERROR,
-            )  # fmt: skip
-            log.info("ERROR   %s  (%s)", url, error)
-            return
+        # 2. Descarga (lanza HostOcupado si el host está lleno); un ErrorDescarga
+        #    se propaga para que ``_procesar`` marque la frontera con error.
+        respuesta = self.descargador.descargar(url, espera_maxima=1.0)
 
         # 3. Auditoría: toda respuesta queda en la bitácora
         self.bd.registrar_bitacora(
@@ -334,7 +345,11 @@ class Arana:
     # Ejecución
     # ------------------------------------------------------------------
     def ejecutar(self, intervalo_progreso: float = 15.0) -> dict[str, int]:
-        """Lanza los hilos y espera hasta vaciar la frontera, llegar a la meta o Ctrl+C."""
+        """Lanza los hilos y espera hasta vaciar la frontera, llegar a la meta o Ctrl+C.
+
+        Al reanudar, las URL que quedaron pendientes en la tabla ``frontera`` se
+        recuperan automáticamente en ``_cargar_frontera``.
+        """
 
         for semilla in self.semillas:
             self.encolar(semilla, 0, None, forzar=True)
@@ -351,7 +366,7 @@ class Arana:
         for hilo in trabajadores:
             hilo.start()
 
-        ultimo_reporte = ultimo_guardado = time.monotonic()
+        ultimo_reporte = time.monotonic()
         try:
             while not self.detener.is_set():
                 time.sleep(1.0)
@@ -366,16 +381,12 @@ class Arana:
                 if ahora - ultimo_reporte >= intervalo_progreso:
                     ultimo_reporte = ahora
                     print(self.texto_progreso(resumen), flush=True)
-                if ahora - ultimo_guardado >= 60:
-                    ultimo_guardado = ahora
-                    self.guardar_frontera()
         except KeyboardInterrupt:
-            print("\nDeteniendo… (se guarda la frontera para reanudar)", flush=True)
+            print("\nDeteniendo… (la frontera queda en la base de datos para reanudar)", flush=True)
         finally:
             self.detener.set()
             for hilo in trabajadores:
                 hilo.join(timeout=TIEMPO_CIERRE)
-            self.guardar_frontera()
         return self.bd.resumen()
 
     def texto_progreso(self, resumen: dict[str, int] | None = None) -> str:
