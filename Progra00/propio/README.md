@@ -86,8 +86,11 @@ sobre la misma cola.
 La cola se atiende en anchura, de menor a mayor `profundidad`, y con FIFO entre
 URLs del mismo nivel. Al arrancar, cada implementación **reconcilia** la
 frontera: descarta lo que ya está fresco en `documentos` y encola el resto. Al
-descubrir enlaces los registra, al terminar de procesarlos los marca
-`visitada`, y los errores se cuentan en `intentos` hasta un tope.
+descubrir enlaces los registra y al terminar de procesarlos los marca
+`visitada`. Un fallo transitorio —un 429/5xx tras agotar los reintentos del
+descargador, o un error de red o de tiempo de espera— suma un intento y deja la
+URL en `error`; al llegar al tope de 3 intentos pasa a `visitada`. Un bloqueo de
+`robots.txt` no es un error y se marca `visitada`.
 
 Como la clave es `hash_url` y la frescura se consulta en la base compartida, se
 puede ejecutar `uv run arañador` y luego `uv run propio` (o al revés) y la
@@ -95,8 +98,8 @@ segunda continúa la misma cola, sin volver a descargar lo ya guardado. Esta
 versión ya no usa `frontera.jsonl` como cola persistente.
 
 Límite conocido: una URL que se descarga y se descarta (por baja densidad u
-otro filtro) queda como `visitada`, mientras que las URLs que fallan tras agotar
-los reintentos pueden reintentarse en una corrida futura.
+otro filtro) queda como `visitada`; una que falla se reintenta hasta 3 veces
+entre corridas y después se da por visitada.
 
 El informe es único, pues su resultado es el mismo sin importar qué
 implementación descargó, y se genera con la versión de Scrapy sobre el
