@@ -10,8 +10,11 @@ Arquitectura:
 
 * :class:`ExtensionFronteraCompartida` escucha las señales del motor y mantiene
   una única conexión durante la vida del crawler:
-  ``request_scheduled`` registra cada URL agendada y ``response_received`` la
-  marca como visitada.
+  ``request_scheduled`` registra cada URL agendada y le adjunta un errback;
+  ``response_received`` cierra la entrada según su código HTTP (``visitada``, o
+  ``error`` si es un 429/5xx transitorio, con tope de intentos). El errback hace
+  lo propio ante fallos de descarga, porque el motor no emite una señal para ese
+  caso.
 * :class:`MiddlewareFronteraInicial` engancha el arranque de la araña
   (``process_start`` en Scrapy >= 2.13, con un ``process_start_requests``
   sincrónico de compatibilidad) para reconciliar la cola con la tabla de
@@ -33,11 +36,13 @@ facilita las pruebas.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator, Iterable, Iterator
 from typing import Any
 
 from scrapy import Request, Spider, signals
 from scrapy.crawler import Crawler
+from scrapy.exceptions import IgnoreRequest
 from scrapy.http import Response
 
 from ...bibliotecas.sqlite import ConexionSQLite
@@ -48,11 +53,17 @@ from ..utilidades.generador_hash import generar_hash_url
 
 __all__ = ["ExtensionFronteraCompartida", "MiddlewareFronteraInicial"]
 
+logger = logging.getLogger(__name__)
+
 #: Espera predeterminada por el bloqueo de SQLite, en segundos.
 TIMEOUT_SQLITE_POR_DEFECTO: float = 0.5
 
 #: Tope de intentos antes de dejar de reintentar una URL con error.
 MAX_INTENTOS_POR_DEFECTO: int = 3
+
+#: Códigos HTTP que se consideran errores transitorios (se reintentan).
+#: Coincide con ``RETRY_HTTP_CODES`` de la configuración del proyecto.
+CODIGOS_ERROR_POR_DEFECTO: frozenset[int] = frozenset({429, 500, 502, 503, 504, 522, 524})
 
 
 def _tiempo_espera(timeout_sqlite: float) -> int:
@@ -86,10 +97,15 @@ class ExtensionFronteraCompartida:
         self,
         conexion: ConexionSQLite,
         repositorio: RepositorioFrontera,
+        *,
+        max_intentos: int = MAX_INTENTOS_POR_DEFECTO,
+        codigos_error: frozenset[int] = CODIGOS_ERROR_POR_DEFECTO,
     ) -> None:
-        """Guarda la conexión y el repositorio ya abiertos."""
+        """Guarda la conexión, el repositorio y la política de errores."""
         self._conexion = conexion
         self._repositorio = repositorio
+        self._max_intentos = max_intentos
+        self._codigos_error = codigos_error
         self._cerrada = False
 
     @classmethod
@@ -97,6 +113,11 @@ class ExtensionFronteraCompartida:
         """Construye la extensión con la configuración efectiva del crawler."""
         ruta = obtener_ruta_base_datos(crawler.settings)
         timeout = crawler.settings.getfloat("FRONTERA_SQLITE_TIMEOUT", TIMEOUT_SQLITE_POR_DEFECTO)
+        max_intentos = crawler.settings.getint("FRONTERA_MAX_INTENTOS", MAX_INTENTOS_POR_DEFECTO)
+        codigos = crawler.settings.getlist("RETRY_HTTP_CODES")
+        codigos_error = (
+            frozenset(int(codigo) for codigo in codigos) if codigos else CODIGOS_ERROR_POR_DEFECTO
+        )
         conexion = ConexionSQLite(
             ruta,
             timeout=timeout,
@@ -107,7 +128,12 @@ class ExtensionFronteraCompartida:
         except BaseException:
             conexion.cerrar()
             raise
-        instancia = cls(conexion, repositorio)
+        instancia = cls(
+            conexion,
+            repositorio,
+            max_intentos=max_intentos,
+            codigos_error=codigos_error,
+        )
         instancia._conectar_senales(crawler)
         return instancia
 
@@ -118,9 +144,13 @@ class ExtensionFronteraCompartida:
         crawler.signals.connect(self.cerrar, signal=signals.spider_closed)
 
     def agendar(self, request: Request, spider: Spider | None = None, **_: Any) -> None:
-        """Registra una solicitud agendada en la frontera compartida."""
+        """Registra una solicitud agendada y le asegura el errback de la frontera."""
         del spider
         self._repositorio.registrar(request.url, _profundidad_de(request))
+        # El errback marca la frontera con error si la descarga falla tras los
+        # reintentos de Scrapy (no hay señal de motor para ese caso).
+        if request.errback is None:
+            request.errback = self._al_fallar_descarga
 
     def recibida(
         self,
@@ -129,12 +159,38 @@ class ExtensionFronteraCompartida:
         spider: Spider | None = None,
         **_: Any,
     ) -> None:
-        """Marca como visitada la URL de la respuesta recibida."""
+        """Cierra la entrada de la frontera según el código HTTP de la respuesta."""
         del spider
         solicitud = getattr(response, "request", None) or request
         if solicitud is None:
             return
-        self._repositorio.marcar_visitada(generar_hash_url(solicitud.url))
+        clave = generar_hash_url(solicitud.url)
+        if response.status in self._codigos_error:
+            # Tras agotar los reintentos del middleware, un 429/5xx es un fallo
+            # transitorio: suma un intento y se reintenta en una corrida futura.
+            self._repositorio.marcar_error(clave, self._max_intentos)
+        else:
+            self._repositorio.marcar_visitada(clave)
+
+    def _al_fallar_descarga(self, failure: Any) -> None:
+        """Manejador de descarga fallida: agota un intento de la URL.
+
+        Se adjunta a cada ``Request`` al agendarla. Un ``IgnoreRequest`` (por
+        ejemplo, bloqueo de ``robots.txt``) no es un error transitorio y se marca
+        ``visitada``. Cualquier otro fallo (timeout, DNS, TLS…) suma un intento
+        y, al alcanzar ``FRONTERA_MAX_INTENTOS``, pasa a ``visitada`` para no
+        reintentarla indefinidamente. Devuelve ``None`` para silenciar la
+        excepción; el fallo ya queda en ``bitacora_recorrido`` por el middleware.
+        """
+        solicitud = getattr(failure, "request", None)
+        if solicitud is None:
+            return
+        clave = generar_hash_url(solicitud.url)
+        if failure.check(IgnoreRequest):
+            self._repositorio.marcar_visitada(clave)
+            return
+        self._repositorio.marcar_error(clave, self._max_intentos)
+        logger.warning("Fallo de descarga; se registra error de frontera: %s", solicitud.url)
 
     def cerrar(
         self,

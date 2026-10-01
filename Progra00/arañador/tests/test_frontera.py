@@ -16,9 +16,11 @@ from typing import Any
 
 import pytest
 from scrapy import Request, signals
+from scrapy.exceptions import IgnoreRequest
 from scrapy.http import Response
 from scrapy.settings import Settings
 from scrapy.signalmanager import SignalManager
+from twisted.python.failure import Failure
 
 from arañador.bibliotecas.sqlite import (
     MIGRACION_FRONTERA,
@@ -526,3 +528,100 @@ def test_settings_de_frontera_declaran_migracion_y_componentes() -> None:
         "arañador.implementacion.extensiones.frontera_compartida.MiddlewareFronteraInicial": 500
     }
     assert ConfiguracionAranador.FRONTERA_MAX_INTENTOS == 3
+
+
+# --------------------------------------------------------------------------
+# Errores: códigos reintentables, respuestas definitivas y fallos de descarga
+# --------------------------------------------------------------------------
+
+
+def _fallo_descarga(solicitud: Request, excepcion: BaseException | None = None) -> Failure:
+    """Construye un ``Failure`` de Twisted con la solicitud asociada."""
+    fallo = Failure(excepcion or TimeoutError("agotado"))
+    fallo.request = solicitud  # ty: ignore[unresolved-attribute]
+    return fallo
+
+
+def _extension_con_ruta(ruta: Path) -> ExtensionFronteraCompartida:
+    """Crea una extensión sobre una base temporal con topes explícitos."""
+    settings = Settings({"RUTA_BASE_DATOS": str(ruta), "FRONTERA_MAX_INTENTOS": 3})
+    crawler = CrawlerFalso(settings)
+    return ExtensionFronteraCompartida.from_crawler(crawler)  # ty: ignore[invalid-argument-type]
+
+
+def _estado(ruta: Path) -> tuple[str, int]:
+    """Devuelve ``(estado, intentos)`` de la única fila de la frontera."""
+    with ConexionSQLite(ruta) as conexion:
+        fila = _fila(conexion, "SELECT estado, intentos FROM frontera")
+        return str(fila["estado"]), int(fila["intentos"])
+
+
+def test_extension_adjunta_errback_al_agendar(tmp_path: Path) -> None:
+    """Cada solicitud agendada recibe el errback, sin pisar uno existente."""
+    extension = _extension_con_ruta(tmp_path / "metadatos.db")
+
+    solicitud = Request(_url(1), meta={"depth": 0})
+    extension.agendar(solicitud)
+    assert solicitud.errback is not None
+
+    def errback_previo(failure: Any) -> None:
+        """Callback de error previo del llamador que no debe sobreescribirse."""
+        return None
+
+    otra = Request(_url(2))
+    otra.errback = errback_previo
+    extension.agendar(otra)
+    assert otra.errback is errback_previo
+    extension.cerrar()
+
+
+def test_extension_marca_error_en_codigos_reintentables(tmp_path: Path) -> None:
+    """Un 503 suma intentos y al tercero pasa a ``visitada``."""
+    ruta = tmp_path / "metadatos.db"
+    extension = _extension_con_ruta(ruta)
+    solicitud = Request(_url(1), meta={"depth": 1})
+    extension.agendar(solicitud)
+
+    extension.recibida(Response(_url(1), status=503, request=solicitud))
+    assert _estado(ruta) == ("error", 1)
+    extension.recibida(Response(_url(1), status=503, request=solicitud))
+    assert _estado(ruta) == ("error", 2)
+    extension.recibida(Response(_url(1), status=503, request=solicitud))
+    assert _estado(ruta) == ("visitada", 3)
+    extension.cerrar()
+
+
+def test_extension_marca_visitada_en_respuesta_no_reintentable(tmp_path: Path) -> None:
+    """Un 404 se considera definitivo y no suma intentos."""
+    ruta = tmp_path / "metadatos.db"
+    extension = _extension_con_ruta(ruta)
+    solicitud = Request(_url(1), meta={"depth": 1})
+    extension.agendar(solicitud)
+
+    extension.recibida(Response(_url(1), status=404, request=solicitud))
+    assert _estado(ruta) == ("visitada", 0)
+    extension.cerrar()
+
+
+def test_extension_errback_marca_error_en_fallo_de_descarga(tmp_path: Path) -> None:
+    """Un fallo de descarga (timeout) agota un intento de la frontera."""
+    ruta = tmp_path / "metadatos.db"
+    extension = _extension_con_ruta(ruta)
+    solicitud = Request(_url(1), meta={"depth": 1})
+    extension.agendar(solicitud)
+
+    extension._al_fallar_descarga(_fallo_descarga(solicitud))
+    assert _estado(ruta) == ("error", 1)
+    extension.cerrar()
+
+
+def test_extension_errback_ignora_ignore_request(tmp_path: Path) -> None:
+    """Un ``IgnoreRequest`` (p. ej. robots) no es error: se marca ``visitada``."""
+    ruta = tmp_path / "metadatos.db"
+    extension = _extension_con_ruta(ruta)
+    solicitud = Request(_url(1), meta={"depth": 1})
+    extension.agendar(solicitud)
+
+    extension._al_fallar_descarga(_fallo_descarga(solicitud, IgnoreRequest("robots")))
+    assert _estado(ruta) == ("visitada", 0)
+    extension.cerrar()
