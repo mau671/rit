@@ -122,15 +122,39 @@ Al finalizar la cosecha o al alcanzar el volumen deseado:
 ```bash
 uv run arañador informe
 ```
-Este comando ejecuta dos etapas de análisis automatizado:
-1. **Exportación de estadísticas:** Concilia los archivos físicos en disco con la base de datos y genera archivos estructurados:
+Este comando ejecuta dos fases de análisis automatizado y anuncia en la salida de errores (`stderr`) el inicio de cada una, además de mostrar una barra de progreso durante el conteo de Zipf:
+
+1. **Fase de estadísticas:** Concilia los archivos físicos en disco con la base de datos y genera archivos estructurados:
    * `resultados/estadisticas/estadisticas.json` con totales y coberturas.
    * `resultados/estadisticas/distribuciones.csv` con métricas por dominio y categoría.
    * `resultados/estadisticas/estadisticas.tex` con tablas listas para el informe en LaTeX.
-2. **Cálculo de la Ley de Zipf:** Recorre todo el texto plano recolectado, cuenta frecuencias de palabras y produce:
+2. **Fase de cálculo de la Ley de Zipf:** Recorre todo el texto plano recolectado, cuenta frecuencias de palabras y produce:
    * `resultados/zipf/grafica_ley_zipf.png` con la curva empírica frente a la función teórica en escala logarítmica doble.
    * `resultados/zipf/estadisticas_zipf.json` con el vocabulario y la constante calculada.
    * `resultados/zipf/tabla_estadisticas.tex` con la tabla de rangos y frecuencias.
+
+#### Opciones del conteo de Zipf
+| Bandera / variable | Efecto |
+| :--- | :--- |
+| `--trabajadores N` | Número de procesos usados para contar frecuencias en paralelo. |
+| `TRABAJADORES_ZIPF` | Variable de entorno equivalente a `--trabajadores`; la bandera tiene prioridad si se indica. |
+| `--cache RUTA` | Habilita la caché incremental y fija su ubicación. |
+| `--sin-cache` | Desactiva la caché incremental. |
+| `--sin-progreso` | Silencia la barra de progreso del conteo. |
+
+**Número de trabajadores:** por defecto es automático y usa hasta 8 procesos según los núcleos disponibles. Un valor de `0` o una variable vacía también seleccionan el modo automático. La precedencia es la bandera `--trabajadores`, luego `TRABAJADORES_ZIPF` y, si ninguna se especifica, el valor automático.
+
+#### Caché incremental
+En `arañador informe` la caché está activa por defecto en `resultados/zipf/cache`, donde se guarda un archivo SQLite `frecuencias_zipf.sqlite`. La caché se reutiliza cuando el corpus no ha cambiado, de modo que una segunda corrida sin modificaciones es prácticamente instantánea; se puede desactivar con `--sin-cache` o cambiar de ruta con `--cache RUTA`. La validez de la caché se determina por la huella del corpus (tamaño y fecha de modificación de los archivos).
+
+#### Nota de rendimiento
+El conteo se optimizó leyendo cada archivo completo en una sola operación en lugar de línea por línea, normalizando el texto con *casefold* una única vez por documento y usando `findall` para extraer las palabras. Sobre esas bases, el conteo paralelo con procesos y la caché por huella reducen el tiempo. En máquinas de 16 núcleos, el conteo de un corpus del orden de 6 GB puede bajar de ~40 minutos a unos pocos minutos, y la segunda corrida sin cambios es casi instantánea por la caché. Estas cifras son orientativas y dependen del hardware y del corpus.
+
+#### Invocación directa del contador
+El módulo de conteo también puede ejecutarse por separado, con sus propias banderas `--trabajadores`, `--cache` y `--sin-progreso`:
+```bash
+python -m arañador.guiones.calcular_zipf --trabajadores 4 --cache resultados/zipf/cache
+```
 
 ---
 
