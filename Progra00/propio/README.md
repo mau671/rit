@@ -6,12 +6,16 @@ No tiene dependencias.
 
 ## Uso
 
+Ambas implementaciones comparten las semillas y el almacenamiento en la raíz
+`Progra00/`, por lo que en el `.env` se usa `RAIZ_DATOS=..` y
+`SEMILLAS=../semillas.txt`.
+
 ```bash
 cp .env.example .env
 uv sync
 uv run propio verificar      # revisa semillas, hosts y base
 uv run propio                # cosecha; Ctrl+C para detener
-uv run propio                # otra vez: reanuda desde almacenamiento/frontera.jsonl
+uv run propio                # otra vez: reanuda desde Progra00/almacenamiento/frontera.jsonl
 tail -f bitacoras/recorrido.log
 uv run pytest
 ```
@@ -50,19 +54,26 @@ uv run pytest
 
 ## Compatibilidad con `../arañador/`
 
-Mismas semillas (se lee `../arañador/arañador/semillas.txt`), mismo esquema
-SQLite, mismas huellas (`normalizador_url.py` y `generador_hash.py` copiados) y
-mismo árbol `{dominio}/documentos/{hash[:2]}/{hash}.txt`. Cada implementación
-escribe en su propia carpeta `almacenamiento/`.
+Las dos implementaciones comparten el mismo almacenamiento en la raíz
+`Progra00/`: la base SQLite `Progra00/almacenamiento/metadatos_araña.db`, el
+repositorio de texto `Progra00/almacenamiento/repositorio/{dominio}/documentos/{hash[:2]}/{hash}.txt`
+y las semillas `Progra00/semillas.txt`. También comparten el mismo esquema
+SQLite y las mismas funciones de hash (`normalizar_url` y `generador_hash`), por
+lo que el árbol de repositorio es idéntico.
 
-Estadísticas y Zipf, desde `../arañador/`:
+Eso permite correr primero una implementación y luego la otra: cada una detecta
+por `hash_url`/`hash_contenido` y `fecha_revisitacion` lo ya descargado por la
+otra y no lo duplica. La única parte que no se comparte es la frontera de URLs
+pendientes (el `JOBDIR` de Scrapy frente al `Progra00/almacenamiento/frontera.jsonl`
+de esta versión), de modo que al cambiar de implementación se reanuda desde las
+semillas y la deduplicación persistente evita volver a descargar lo que ya está.
+
+El informe es único, pues su resultado es el mismo sin importar qué
+implementación descargó, y se genera con la versión de Scrapy sobre el
+almacenamiento compartido, sin invocar módulos de `../arañador/` para analizar
+`propio`:
 
 ```bash
-uv run python -m arañador.guiones.exportar_estadisticas \
-  --bd ../propio/almacenamiento/metadatos_araña.db \
-  --repositorio ../propio/almacenamiento/repositorio \
-  --salida ../propio/resultados/estadisticas
-uv run python -m arañador.guiones.calcular_zipf \
-  --entrada ../propio/almacenamiento/repositorio \
-  --salida ../propio/resultados/zipf
+cd ../arañador
+uv run arañador informe   # estadísticas y ley de Zipf sobre Progra00/almacenamiento/
 ```

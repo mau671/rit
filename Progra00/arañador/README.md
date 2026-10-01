@@ -58,7 +58,7 @@ flowchart TD
 ```
 
 ### Ciclo de procesamiento secuencial
-1. **Inicialización:** El archivo `semillas.txt` provee las 15 direcciones iniciales. La araña extrae dinámicamente los dominios permitidos sin fijar nombres de servidores en el código.
+1. **Inicialización:** El archivo compartido `Progra00/semillas.txt` provee las 15 direcciones iniciales. La araña extrae dinámicamente los dominios permitidos sin fijar nombres de servidores en el código.
 2. **Descarga:** El motor asíncrono consulta el archivo `robots.txt` del servidor, aplica las políticas de retardo y realiza las peticiones HTTP.
 3. **Auditoría:** El intermediario de descarga captura cada respuesta o fallo de red y guarda una entrada en la tabla `bitacora_recorrido` de SQLite con el tiempo de respuesta, el código HTTP y el dominio.
 4. **Cortesía en el documento:** La araña inspecciona las directivas de las etiquetas meta de robots y del encabezado `X-Robots-Tag`. Si detecta `noindex`, descarta el texto para almacenamiento; si detecta `nofollow`, interrumpe el seguimiento de enlaces salientes.
@@ -102,13 +102,16 @@ uv sync --python 3.12
 ### 4.3. Configuración del proyecto
 El proyecto carga sus variables desde el archivo `.env`. El archivo incluye valores predeterminados:
 ```dotenv
-RAIZ_DATOS=.
+RAIZ_DATOS=..
 USER_AGENT="AranadorAudiovisualBot/1.0 (+https://tec.ac.cr/ic8060)"
+SEMILLAS=../semillas.txt
 LOG_LEVEL=INFO
 LOG_FILE=bitacoras/cosecha.log
 INTERVALO_PROGRESO=15
 OBJETIVO_GIB=10
+TRABAJADORES_ZIPF=0
 ```
+Con `RAIZ_DATOS=..` cada proyecto resuelve `..` contra su propia raíz, de modo que ambas implementaciones usan la raíz compartida `Progra00/` para `almacenamiento/` y `resultados/`, y `SEMILLAS=../semillas.txt` apunta a `Progra00/semillas.txt`.
 
 ### 4.4. Ejecución del proceso de cosecha
 Para iniciar la recolección con visualización de progreso cada 15 segundos:
@@ -122,16 +125,16 @@ Al finalizar la cosecha o al alcanzar el volumen deseado:
 ```bash
 uv run arañador informe
 ```
-Este comando ejecuta dos fases de análisis automatizado y anuncia en la salida de errores (`stderr`) el inicio de cada una, además de mostrar una barra de progreso durante el conteo de Zipf:
+Este es el único comando de informe de las dos implementaciones: lee el almacenamiento compartido `Progra00/almacenamiento/` (la base SQLite `metadatos_araña.db` y el repositorio de texto plano) sin importar cuál de los dos arañadores hizo la descarga, y escribe sus salidas bajo `Progra00/resultados/` porque estas derivan de `RAIZ_DATOS`. El comando ejecuta dos fases de análisis automatizado y anuncia en la salida de errores (`stderr`) el inicio de cada una, además de mostrar una barra de progreso durante el conteo de Zipf:
 
 1. **Fase de estadísticas:** Concilia los archivos físicos en disco con la base de datos y genera archivos estructurados:
-   * `resultados/estadisticas/estadisticas.json` con totales y coberturas.
-   * `resultados/estadisticas/distribuciones.csv` con métricas por dominio y categoría.
-   * `resultados/estadisticas/estadisticas.tex` con tablas listas para el informe en LaTeX.
+   * `Progra00/resultados/estadisticas/estadisticas.json` con totales y coberturas.
+   * `Progra00/resultados/estadisticas/distribuciones.csv` con métricas por dominio y categoría.
+   * `Progra00/resultados/estadisticas/estadisticas.tex` con tablas listas para el informe en LaTeX.
 2. **Fase de cálculo de la Ley de Zipf:** Recorre todo el texto plano recolectado, cuenta frecuencias de palabras y produce:
-   * `resultados/zipf/grafica_ley_zipf.png` con la curva empírica frente a la función teórica en escala logarítmica doble.
-   * `resultados/zipf/estadisticas_zipf.json` con el vocabulario y la constante calculada.
-   * `resultados/zipf/tabla_estadisticas.tex` con la tabla de rangos y frecuencias.
+   * `Progra00/resultados/zipf/grafica_ley_zipf.png` con la curva empírica frente a la función teórica en escala logarítmica doble.
+   * `Progra00/resultados/zipf/estadisticas_zipf.json` con el vocabulario y la constante calculada.
+   * `Progra00/resultados/zipf/tabla_estadisticas.tex` con la tabla de rangos y frecuencias.
 
 #### Opciones del conteo de Zipf
 | Bandera / variable | Efecto |
@@ -145,7 +148,7 @@ Este comando ejecuta dos fases de análisis automatizado y anuncia en la salida 
 **Número de trabajadores:** por defecto es automático y usa hasta 8 procesos según los núcleos disponibles. Un valor de `0` o una variable vacía también seleccionan el modo automático. La precedencia es la bandera `--trabajadores`, luego `TRABAJADORES_ZIPF` y, si ninguna se especifica, el valor automático.
 
 #### Caché incremental
-En `arañador informe` la caché está activa por defecto en `resultados/zipf/cache`, donde se guarda un archivo SQLite `frecuencias_zipf.sqlite`. La caché se reutiliza cuando el corpus no ha cambiado, de modo que una segunda corrida sin modificaciones es prácticamente instantánea; se puede desactivar con `--sin-cache` o cambiar de ruta con `--cache RUTA`. La validez de la caché se determina por la huella del corpus (tamaño y fecha de modificación de los archivos).
+En `arañador informe` la caché está activa por defecto en `Progra00/resultados/zipf/cache`, donde se guarda un archivo SQLite `frecuencias_zipf.sqlite`. La caché se reutiliza cuando el corpus no ha cambiado, de modo que una segunda corrida sin modificaciones es prácticamente instantánea; se puede desactivar con `--sin-cache` o cambiar de ruta con `--cache RUTA`. La validez de la caché se determina por la huella del corpus (tamaño y fecha de modificación de los archivos).
 
 #### Nota de rendimiento
 El conteo se optimizó leyendo cada archivo completo en una sola operación en lugar de línea por línea, normalizando el texto con *casefold* una única vez por documento y usando `findall` para extraer las palabras. Sobre esas bases, el conteo paralelo con procesos y la caché por huella reducen el tiempo. En máquinas de 16 núcleos, el conteo de un corpus del orden de 6 GB puede bajar de ~40 minutos a unos pocos minutos, y la segunda corrida sin cambios es casi instantánea por la caché. Estas cifras son orientativas y dependen del hardware y del corpus.
@@ -153,7 +156,7 @@ El conteo se optimizó leyendo cada archivo completo en una sola operación en l
 #### Invocación directa del contador
 El módulo de conteo también puede ejecutarse por separado, con sus propias banderas `--trabajadores`, `--cache` y `--sin-progreso`:
 ```bash
-python -m arañador.guiones.calcular_zipf --trabajadores 4 --cache resultados/zipf/cache
+python -m arañador.guiones.calcular_zipf --trabajadores 4 --cache Progra00/resultados/zipf/cache
 ```
 
 ---
