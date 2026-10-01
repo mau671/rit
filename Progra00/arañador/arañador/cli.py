@@ -97,19 +97,46 @@ def ejecutar_cosecha() -> int:
     return 0
 
 
-def ejecutar_informe() -> int:
+def ejecutar_informe(
+    trabajadores: int | None = None,
+    cache: Path | None = None,
+    progreso: bool = True,
+) -> int:
     """Genera las estadísticas del repositorio y la curva de la ley de Zipf.
 
     Son dos cálculos internos con costos distintos: las estadísticas leen
     SQLite y el tamaño de los archivos; Zipf recorre todo el texto. Para el
-    usuario son una sola tarea del informe.
+    usuario son una sola tarea del informe, por eso se anuncian las dos fases
+    antes de ejecutarlas y se reenvían las opciones de Zipf.
+
+    Args:
+        trabajadores: Número de procesos para Zipf; ``None`` usa el automático.
+        cache: Ruta de la caché incremental de Zipf; ``None`` la desactiva.
+        progreso: Si es ``False``, Zipf omite su barra de progreso.
+
+    Returns:
+        0 sólo si ambas fases terminan con éxito.
     """
 
     from arañador.guiones.calcular_zipf import main as generar_zipf
     from arañador.guiones.exportar_estadisticas import main as exportar_estadisticas
 
+    print("Fase 1/2: estadísticas del repositorio...", flush=True)
     codigo_estadisticas = exportar_estadisticas([])
-    codigo_zipf = generar_zipf([])
+
+    argumentos_zipf: list[str] = []
+    if cache is not None:
+        argumentos_zipf += ["--cache", str(cache)]
+    if trabajadores is not None:
+        argumentos_zipf += ["--trabajadores", str(trabajadores)]
+    if not progreso:
+        argumentos_zipf.append("--sin-progreso")
+
+    print(
+        "Fase 2/2: cálculo de la ley de Zipf (puede tardar varios minutos)...",
+        flush=True,
+    )
+    codigo_zipf = generar_zipf(argumentos_zipf)
     return 0 if codigo_estadisticas == 0 and codigo_zipf == 0 else 1
 
 
@@ -122,9 +149,31 @@ def construir_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="store_true", help="muestra la versión")
     subcomandos = parser.add_subparsers(dest="comando", metavar="{informe}")
-    subcomandos.add_parser(
+    informe = subcomandos.add_parser(
         "informe",
         help="genera estadísticas del repositorio y la curva de Zipf",
+    )
+    informe.add_argument(
+        "--trabajadores",
+        type=int,
+        default=None,
+        help="número de procesos para el cálculo de Zipf (por defecto, automático)",
+    )
+    informe.add_argument(
+        "--cache",
+        type=Path,
+        default=None,
+        help="ruta de la caché incremental de Zipf",
+    )
+    informe.add_argument(
+        "--sin-cache",
+        action="store_true",
+        help="desactiva la caché incremental de Zipf",
+    )
+    informe.add_argument(
+        "--sin-progreso",
+        action="store_true",
+        help="oculta la barra de progreso del cálculo de Zipf",
     )
     return parser
 
@@ -142,7 +191,19 @@ def main(argumentos: Sequence[str] | None = None) -> int:
         return 0
 
     if opciones.comando == "informe":
-        return ejecutar_informe()
+        from arañador.implementacion.utilidades.rutas import resolver_ruta_datos
+
+        if opciones.sin_cache:
+            cache: Path | None = None
+        else:
+            cache = opciones.cache
+            if cache is None:
+                cache = resolver_ruta_datos("resultados", "zipf", "cache")
+        return ejecutar_informe(
+            trabajadores=opciones.trabajadores,
+            cache=cache,
+            progreso=not opciones.sin_progreso,
+        )
     if opciones.comando is not None:
         parser.error(f"subcomando desconocido: {opciones.comando}")
 
