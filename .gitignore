@@ -36,3 +36,12 @@ dist/
 .DS_Store
 *.swp
 *~
+
+# Artefactos de compilación de LaTeX (Progra00.tex)
+*.aux
+*.log
+*.toc
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
