@@ -31,6 +31,12 @@ salidas/
 build/
 dist/
 *.egg-info/
+*.tar.gz
+
+# Archivos de enunciados e instrucciones
+Instrucciones.md
+*Instrucciones*.pdf
+Proyecto*.pdf
 
 # Sistema
 .DS_Store

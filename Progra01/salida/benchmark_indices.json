@@ -1,0 +1,47 @@
+[
+  {
+    "nombre_politica": "minimo",
+    "descripcion": "Política 1: Tokenización básica y minúsculas sin stopwords ni stemming",
+    "ruta_archivo": "salida/indice_minimo.idx",
+    "total_documentos": 500,
+    "tamano_vocabulario": 88018,
+    "total_postings": 600454,
+    "tamano_archivo_bytes": 9854313,
+    "tamano_archivo_mb": 9.4,
+    "tiempo_segundos": 6.488,
+    "tiempo_cpu_segundos": 6.405,
+    "memoria_pico_mb": 86.88,
+    "postings_por_termino_promedio": 6.82,
+    "bytes_por_documento_promedio": 19708.63
+  },
+  {
+    "nombre_politica": "estandar",
+    "descripcion": "Política 2: Minúsculas, eliminación de puntuación, stopwords ES+EN y stemming Snowball",
+    "ruta_archivo": "salida/indice_estandar.idx",
+    "total_documentos": 500,
+    "tamano_vocabulario": 59224,
+    "total_postings": 459396,
+    "tamano_archivo_bytes": 7248099,
+    "tamano_archivo_mb": 6.91,
+    "tiempo_segundos": 10.481,
+    "tiempo_cpu_segundos": 10.391,
+    "memoria_pico_mb": 87.61,
+    "postings_por_termino_promedio": 7.76,
+    "bytes_por_documento_promedio": 14496.2
+  },
+  {
+    "nombre_politica": "avanzado",
+    "descripcion": "Política 3: Normalización completa con stopwords, stemming, números, fechas y tesauro de sinónimos",
+    "ruta_archivo": "salida/indice_avanzado.idx",
+    "total_documentos": 500,
+    "tamano_vocabulario": 57619,
+    "total_postings": 451469,
+    "tamano_archivo_bytes": 7111346,
+    "tamano_archivo_mb": 6.78,
+    "tiempo_segundos": 15.955,
+    "tiempo_cpu_segundos": 15.751,
+    "memoria_pico_mb": 88.36,
+    "postings_por_termino_promedio": 7.84,
+    "bytes_por_documento_promedio": 14222.69
+  }
+]

@@ -97,17 +97,44 @@ _ENTRADA_LISTA = re.compile(
     re.IGNORECASE | re.UNICODE,
 )
 
+_PATRON_PALABRA = re.compile(r"[^\W_]{2,}", re.UNICODE)
+_PATRON_ARTEFACTOS_INICIALES = re.compile(r"^(?:Apariencia\s*\n+)+", re.IGNORECASE)
+_TERMINOS_DESAMBIGUACION = (
+    "(desambiguación)",
+    "(desambiguacion)",
+    "(disambiguation)",
+    "_desambiguación",
+    "_desambiguacion",
+    "_disambiguation",
+)
+_PATRONES_DESAMBIGUACION_TEXTO = (
+    "puede referirse a:",
+    "pueden referirse a:",
+    "puede hacer referencia a:",
+    "pueden hacer referencia a:",
+    "may refer to:",
+    "página de desambiguación",
+    "pagina de desambiguacion",
+    "disambiguation page",
+    "esta es una página de desambiguación",
+    "esta es una pagina de desambiguacion",
+    "desambiguación de",
+    "desambiguacion de",
+)
+
 
 class TuberiaValidacion:
     """Normaliza y valida un :class:`DocumentoItem` antes de almacenarlo.
 
-    La longitud mínima de 300 caracteres del proyecto se aplica a páginas
-    narrativas.  Las páginas de índice y listas legítimas se identifican por su
-    estructura; se exceptúan del umbral de longitud y usan una densidad
-    mínima relajada, evitando que un catálogo útil sea descartado por ser corto.
+    Aplica umbrales mínimos de caracteres, palabras y densidad para contenido
+    narrativo estándar y para listas reconocidas. Descarta páginas de
+    desambiguación y limpia artefactos iniciales.
 
     Args:
-        caracteres_minimos: Mínimo de caracteres para contenido no listoso.
+        caracteres_minimos: Mínimo de caracteres para contenido estándar.
+        caracteres_minimos_lista: Mínimo de caracteres para listas reconocidas.
+        palabras_minimas: Mínimo de palabras para contenido estándar.
+        palabras_minimas_lista: Mínimo de palabras para listas reconocidas.
         densidad_minima: Proporción mínima de caracteres alfanuméricos entre los
             caracteres no blancos para contenido no listoso.
         densidad_minima_lista: Umbral relajado para una lista reconocida.
@@ -121,7 +148,10 @@ class TuberiaValidacion:
 
     def __init__(
         self,
-        caracteres_minimos: int = 300,
+        caracteres_minimos: int = 500,
+        caracteres_minimos_lista: int = 300,
+        palabras_minimas: int = 100,
+        palabras_minimas_lista: int = 50,
         densidad_minima: float = 0.35,
         densidad_minima_lista: float = 0.15,
         entradas_minimas_lista: int = 3,
@@ -134,6 +164,18 @@ class TuberiaValidacion:
             raise TypeError("caracteres_minimos debe ser un entero")
         if caracteres_minimos < 0:
             raise ValueError("caracteres_minimos no puede ser negativo")
+        if isinstance(caracteres_minimos_lista, bool) or not isinstance(caracteres_minimos_lista, int):
+            raise TypeError("caracteres_minimos_lista debe ser un entero")
+        if caracteres_minimos_lista < 0:
+            raise ValueError("caracteres_minimos_lista no puede ser negativo")
+        if isinstance(palabras_minimas, bool) or not isinstance(palabras_minimas, int):
+            raise TypeError("palabras_minimas debe ser un entero")
+        if palabras_minimas < 0:
+            raise ValueError("palabras_minimas no puede ser negativo")
+        if isinstance(palabras_minimas_lista, bool) or not isinstance(palabras_minimas_lista, int):
+            raise TypeError("palabras_minimas_lista debe ser un entero")
+        if palabras_minimas_lista < 0:
+            raise ValueError("palabras_minimas_lista no puede ser negativo")
         if isinstance(densidad_minima, bool) or not isinstance(densidad_minima, (int, float)):
             raise TypeError("densidad_minima debe ser numérica")
         if not 0.0 <= densidad_minima <= 1.0:
@@ -156,6 +198,9 @@ class TuberiaValidacion:
             raise ValueError("dias_revisitacion debe ser al menos uno")
 
         self.caracteres_minimos = caracteres_minimos
+        self.caracteres_minimos_lista = caracteres_minimos_lista
+        self.palabras_minimas = palabras_minimas
+        self.palabras_minimas_lista = palabras_minimas_lista
         self.densidad_minima = densidad_minima
         self.densidad_minima_lista = densidad_minima_lista
         self.entradas_minimas_lista = entradas_minimas_lista
@@ -194,7 +239,10 @@ class TuberiaValidacion:
 
         densidad_minima = settings.getfloat("TUBERIA_DENSIDAD_MINIMA", 0.35)
         return cls(
-            caracteres_minimos=settings.getint("TUBERIA_LONGITUD_MINIMA", 300),
+            caracteres_minimos=settings.getint("TUBERIA_LONGITUD_MINIMA", 500),
+            caracteres_minimos_lista=settings.getint("TUBERIA_LONGITUD_MINIMA_LISTA", 300),
+            palabras_minimas=settings.getint("TUBERIA_PALABRAS_MINIMAS", 100),
+            palabras_minimas_lista=settings.getint("TUBERIA_PALABRAS_MINIMAS_LISTA", 50),
             densidad_minima=densidad_minima,
             densidad_minima_lista=settings.getfloat(
                 "TUBERIA_DENSIDAD_MINIMA_LISTA", min(0.15, densidad_minima)
@@ -232,10 +280,17 @@ class TuberiaValidacion:
         datos = self._convertir_a_datos(item)
         url = self._normalizar_url(datos.get("url"))
         texto = self._normalizar_texto(datos.get("texto"))
+        texto = self._limpiar_artefactos(texto)
+        if not texto:
+            raise DropItem("El texto está vacío tras la limpieza de artefactos")
         dominio = self._normalizar_dominio(datos.get("dominio"), url)
 
         self._validar_extension(url)
-        es_lista = self._es_lista_probable(url, datos.get("titulo"), datos.get("categoria"), texto)
+        titulo = self._normalizar_texto_nulo(datos.get("titulo"))
+        if self._es_desambiguacion(url, titulo, texto):
+            raise DropItem("Página de desambiguación descartada")
+
+        es_lista = self._es_lista_probable(url, titulo, datos.get("categoria"), texto)
         self._validar_texto(texto, es_lista=es_lista)
 
         if "codigo_http" not in datos or datos["codigo_http"] is None:
@@ -259,7 +314,6 @@ class TuberiaValidacion:
         )
 
         categoria = self._normalizar_texto_opcional(datos.get("categoria"), "sin_categoria")
-        titulo = self._normalizar_texto_nulo(datos.get("titulo"))
         idioma = self._normalizar_texto_nulo(datos.get("idioma"))
         ruta_relativa = self._normalizar_texto_opcional(datos.get("ruta_relativa"), "")
 
@@ -369,18 +423,62 @@ class TuberiaValidacion:
         if extension in self.extensiones_prohibidas:
             raise DropItem(f"La extensión '.{extension}' no contiene texto limpio")
 
+    @staticmethod
+    def _contar_palabras(texto: str) -> int:
+        """Cuenta tokens alfanuméricos de longitud >= 2."""
+        return len(_PATRON_PALABRA.findall(texto))
+
+    @staticmethod
+    def _limpiar_artefactos(texto: str) -> str:
+        """Elimina artefactos iniciales típicos de navegación como 'Apariencia\\n\\n'."""
+        return _PATRON_ARTEFACTOS_INICIALES.sub("", texto).strip()
+
+    @staticmethod
+    def _es_desambiguacion(url: str, titulo: str | None, texto: str) -> bool:
+        """Determina si la página corresponde a una desambiguación."""
+        url_decodificada = unquote(url).lower()
+        if any(termino in url_decodificada for termino in _TERMINOS_DESAMBIGUACION):
+            return True
+        if titulo:
+            titulo_lower = titulo.lower()
+            if any(termino in titulo_lower for termino in _TERMINOS_DESAMBIGUACION):
+                return True
+
+        lineas_inicio = [linea.strip().lower() for linea in texto.splitlines()[:10] if linea.strip()]
+        texto_inicio = " ".join(lineas_inicio)
+        return any(patron in texto_inicio for patron in _PATRONES_DESAMBIGUACION_TEXTO)
+
     def _validar_texto(self, texto: str, *, es_lista: bool) -> None:
         caracteres_visibles = [caracter for caracter in texto if not caracter.isspace()]
         caracteres_alfanumericos = sum(caracter.isalnum() for caracter in caracteres_visibles)
         densidad = (
             caracteres_alfanumericos / len(caracteres_visibles) if caracteres_visibles else 0.0
         )
+        palabras = self._contar_palabras(texto)
 
-        if not es_lista and len(texto) < self.caracteres_minimos:
-            raise DropItem(
-                f"El texto tiene {len(texto)} caracteres; se requieren "
-                f"{self.caracteres_minimos} o una estructura de lista válida"
-            )
+        if es_lista:
+            if len(texto) < self.caracteres_minimos_lista:
+                raise DropItem(
+                    f"La lista tiene {len(texto)} caracteres; se requieren "
+                    f"{self.caracteres_minimos_lista}"
+                )
+            if palabras < self.palabras_minimas_lista:
+                raise DropItem(
+                    f"La lista tiene {palabras} palabras; se requieren al menos "
+                    f"{self.palabras_minimas_lista}"
+                )
+        else:
+            if len(texto) < self.caracteres_minimos:
+                raise DropItem(
+                    f"El texto tiene {len(texto)} caracteres; se requieren "
+                    f"{self.caracteres_minimos} o una estructura de lista válida"
+                )
+            if palabras < self.palabras_minimas:
+                raise DropItem(
+                    f"El texto tiene {palabras} palabras; se requieren al menos "
+                    f"{self.palabras_minimas}"
+                )
+
         densidad_requerida = self.densidad_minima_lista if es_lista else self.densidad_minima
         if densidad < densidad_requerida:
             tipo_texto = "lista" if es_lista else "documento"

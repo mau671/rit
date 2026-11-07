@@ -60,11 +60,41 @@ def _resumen_progreso() -> str:
     return formatear_instantanea(instantanea)
 
 
+def _resumen_rapido() -> str:
+    """Progreso instantáneo desde SQLite, sin recorrer el disco.
+
+    El barrido completo de los .txt queda reservado para el resumen final y
+    el informe; cada tick en vivo usa solo los agregados de ``documentos``,
+    que es lo mismo que decide si una URL se vuelve a descargar.
+    """
+
+    from arañador.guiones.monitorear_progreso import (
+        RUTA_BASE_DATOS_PREDETERMINADA,
+        ErrorMonitoreo,
+        consultar_resumen_base_datos,
+    )
+
+    try:
+        resumen = consultar_resumen_base_datos(RUTA_BASE_DATOS_PREDETERMINADA)
+    except ErrorMonitoreo as error:
+        return f"Progreso no disponible todavía: {error}"
+    objetivo_gib = leer_entero("OBJETIVO_GIB", 10)
+    objetivo_bytes = objetivo_gib * 1024**3
+    porcentaje = resumen.bytes_metadatos / objetivo_bytes * 100.0 if objetivo_bytes else 0.0
+    gib = resumen.bytes_metadatos / 1024**3
+    dominios = sum(1 for d in resumen.distribucion_dominios if d.documentos > 0)
+    return (
+        f"Documentos: {resumen.documentos:,} | "
+        f"texto: {gib:.3f}/{objetivo_gib:g} GiB ({porcentaje:.2f} %) | "
+        f"dominios: {dominios}".replace(",", " ")
+    )
+
+
 def _bucle_progreso(detener: threading.Event, intervalo: int) -> None:
     """Imprime el progreso cada ``intervalo`` segundos hasta terminar."""
 
     while not detener.is_set():
-        print("\n" + _resumen_progreso(), flush=True)
+        print("\n" + _resumen_rapido(), flush=True)
         detener.wait(intervalo)
 
 

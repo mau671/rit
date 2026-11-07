@@ -9,6 +9,7 @@ limpieza del texto ocurren más adelante, en las tuberías de Scrapy.
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator, Generator, Iterable
 from pathlib import Path
 from typing import Any, Final
@@ -183,8 +184,33 @@ class AranaSemillas(Spider):
     # Exclusiones generales de extensiones, compartidas con los settings.
     EXTENSIONES_EXCLUIDAS: frozenset[str] = frozenset(ConfiguracionAranador.EXTENSIONES_EXCLUIDAS)
 
+    # Patrones de URLs no documentales o administrativas que deben rechazarse inmediatamente.
+    PATRONES_EXCLUIDOS: tuple[re.Pattern[str], ...] = (
+        # Acciones de MediaWiki en query params
+        re.compile(
+            r"[?&](?:action=(?:edit|history|delete|protect|raw|info|submit|render)|diff=|oldid=)",
+            re.IGNORECASE,
+        ),
+        # Namespaces administrativos de Wikipedia / MediaWiki
+        re.compile(
+            r"/wiki/(?:Especial|Special|Discusi[óo]n|Talk|Usuario|User|Usuaria|Plantilla|Template|Ayuda|Help|Wikiproyecto|Wikiproject|Archivo|File|MediaWiki):",
+            re.IGNORECASE,
+        ),
+        # TVTropes: secciones no documentales
+        re.compile(
+            r"/pmwiki/pmwiki\.php/(?:Discussion|Administrivia|SugarWiki|YMMV)/",
+            re.IGNORECASE,
+        ),
+    )
+
+    # Patrones de páginas Hub / navegación (se siguen enlaces pero NO se almacenan como documentos)
+    PATRONES_HUB: tuple[re.Pattern[str], ...] = (
+        re.compile(r"/wiki/(?:Categor[íi]a|Category|Portal):", re.IGNORECASE),
+        re.compile(r"\((?:desambiguaci[óo]n|disambiguation)\)", re.IGNORECASE),
+    )
+
     def __init__(self, name: str | None = None, **kwargs: Any) -> None:
-        """Inicializa el extractor genérico de enlaces internos."""
+        """Inicializa los extractores de enlaces internos."""
 
         super().__init__(name, **kwargs)
         self._extractor_enlaces = LinkExtractor(
@@ -192,8 +218,22 @@ class AranaSemillas(Spider):
             deny_extensions=sorted(self.EXTENSIONES_EXCLUIDAS),
             unique=True,
         )
+        self._extractor_enlaces_wiki = LinkExtractor(
+            allow_domains=list(self.allowed_domains),
+            deny_extensions=sorted(self.EXTENSIONES_EXCLUIDAS),
+            restrict_css=("#mw-content-text", "#bodyContent"),
+            unique=True,
+        )
         # Evita repetir la advertencia por cada respuesta de un host ajeno.
         self._hosts_advertidos: set[str] = set()
+
+    @classmethod
+    def es_pagina_hub(cls, url: str, titulo: str | None = None) -> bool:
+        """Identifica si una URL o título corresponde a una página hub (categoría, portal, desambiguación)."""
+        url_decodificada = unquote(url)
+        if any(patron.search(url_decodificada) for patron in cls.PATRONES_HUB):
+            return True
+        return bool(titulo and any(patron.search(titulo) for patron in cls.PATRONES_HUB))
 
     @classmethod
     def update_settings(cls, settings: BaseSettings) -> None:
@@ -227,10 +267,14 @@ class AranaSemillas(Spider):
             return
 
         directivas_robots = self._extraer_directivas_robots(response)
+        titulo = self._extraer_titulo(response)
+        es_hub = self.es_pagina_hub(response.url, titulo)
 
         # Política de cortesía inline: noindex prohíbe almacenar el documento.
+        # Las páginas hub (categorías, portales, desambiguaciones) tampoco se guardan como documentos.
         if (
             200 <= response.status < 300
+            and not es_hub
             and "noindex" not in directivas_robots
             and "none" not in directivas_robots
         ):
@@ -267,10 +311,11 @@ class AranaSemillas(Spider):
         return directivas
 
     def es_url_permitida(self, url: str) -> bool:
-        """Indica si una URL pertenece a los hosts derivados y no es binaria.
+        """Indica si una URL pertenece a los hosts derivados y no es binaria ni administrativa.
 
         La comprobación es genérica: esquema HTTP(S), host permitido (o uno de
-        sus subdominios), sin credenciales y con una extensión utilizable.
+        sus subdominios), sin credenciales, con una extensión utilizable y sin
+        patrones administrativos ni de mantenimiento.
         """
 
         try:
@@ -283,6 +328,11 @@ class AranaSemillas(Spider):
             return False
         if self._tiene_extension_excluida(partes.path):
             return False
+
+        url_decodificada = unquote(url)
+        if any(patron.search(url_decodificada) for patron in self.PATRONES_EXCLUIDOS):
+            return False
+
         return any(
             self._host_permitido(partes.hostname, dominio) for dominio in self.allowed_domains
         )
@@ -294,7 +344,15 @@ class AranaSemillas(Spider):
         if profundidad >= self.PROFUNDIDAD_MAXIMA:
             return
 
-        for enlace in self._extractor_enlaces.extract_links(response):
+        host = (urlsplit(response.url).hostname or "").casefold()
+        if host == "wikipedia.org" or host.endswith(".wikipedia.org"):
+            enlaces = self._extractor_enlaces_wiki.extract_links(response)
+            if not enlaces:
+                enlaces = self._extractor_enlaces.extract_links(response)
+        else:
+            enlaces = self._extractor_enlaces.extract_links(response)
+
+        for enlace in enlaces:
             url, _fragmento = urldefrag(response.urljoin(enlace.url))
             if not self.es_url_permitida(url):
                 continue

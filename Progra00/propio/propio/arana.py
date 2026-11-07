@@ -18,6 +18,7 @@ import itertools
 import logging
 import os
 import queue
+import re
 import tempfile
 import threading
 import time
@@ -37,13 +38,51 @@ from .configuracion import (
     RUTA_REPOSITORIO,
 )
 from .descargador import Descargador, ErrorDescarga, HostOcupado
-from .extraccion import analizar_html, directivas_de_cabecera, motivo_rechazo
+from .extraccion import (
+    analizar_html,
+    directivas_de_cabecera,
+    es_lista_probable,
+    motivo_rechazo,
+)
 from .generador_hash import hash_contenido, hash_url
 from .normalizador_url import normalizar_url, obtener_host_origen
 from .rutas import ruta_relativa_documento
 from .semillas import derivar_hosts, host_permitido
 
 log = logging.getLogger(__name__)
+
+# Patrones de URLs no documentales o administrativas de MediaWiki/Wikipedia y TVTropes
+PATRONES_EXCLUIDOS: tuple[re.Pattern[str], ...] = (
+    # Acciones de MediaWiki en query params
+    re.compile(
+        r"[?&](?:action=(?:edit|history|delete|protect|raw|info|submit|render)|diff=|oldid=)",
+        re.IGNORECASE,
+    ),
+    # Namespaces administrativos de Wikipedia / MediaWiki
+    re.compile(
+        r"/wiki/(?:Especial|Special|Discusi[óo]n|Talk|Usuario|User|Usuaria|Plantilla|Template|Ayuda|Help|Wikiproyecto|Wikiproject|Archivo|File|MediaWiki):",
+        re.IGNORECASE,
+    ),
+    # TVTropes
+    re.compile(
+        r"/pmwiki/pmwiki\.php/(?:Discussion|Administrivia|SugarWiki|YMMV)/",
+        re.IGNORECASE,
+    ),
+)
+
+# Patrones de páginas Hub / navegación
+PATRONES_HUB: tuple[re.Pattern[str], ...] = (
+    re.compile(r"/wiki/(?:Categor[íi]a|Category|Portal):", re.IGNORECASE),
+    re.compile(r"\((?:desambiguaci[óo]n|disambiguation)\)", re.IGNORECASE),
+)
+
+
+def es_pagina_hub(url: str, titulo: str = "") -> bool:
+    """Indica si la página es un concentrador de enlaces (categoría, portal, desambiguación)."""
+    url_decodificada = unquote(url)
+    if any(patron.search(url_decodificada) for patron in PATRONES_HUB):
+        return True
+    return bool(titulo and any(patron.search(titulo) for patron in PATRONES_HUB))
 
 # Tupla que guarda la frontera. PriorityQueue ordena por el primer campo, así
 # que las URL con menor profundidad salen primero: recorrido en AMPLITUD.
@@ -81,7 +120,7 @@ class Arana:
     # Frontera (política de selección)
     # ------------------------------------------------------------------
     def url_aceptable(self, url: str) -> bool:
-        """Filtro de selección: esquema, host permitido, largo y extensión."""
+        """Filtro de selección: esquema, host permitido, largo, extensión y no administrativo."""
 
         if len(url) > LONGITUD_MAXIMA_URL:
             return False
@@ -95,6 +134,9 @@ class Arana:
             return False
         nombre = unquote(partes.path).lower().rsplit("/", 1)[-1]
         if "." in nombre and "." + nombre.rsplit(".", 1)[-1] in EXTENSIONES_EXCLUIDAS:
+            return False
+        url_decodificada = unquote(url)
+        if any(patron.search(url_decodificada) for patron in PATRONES_EXCLUIDOS):
             return False
         return host_permitido(partes.hostname, self.hosts)
 
@@ -263,8 +305,14 @@ class Arana:
             )  # fmt: skip
             return
 
+        # 6b. Páginas Hub (Categorías, Portales, Desambiguaciones): son solo para navegación
+        if es_pagina_hub(url_final, html.titulo):
+            log.info("HUB     %s", url_final)
+            return
+
         # 7. Calidad del texto
-        motivo = motivo_rechazo(html.texto)
+        es_lista = es_lista_probable(html.texto, titulo=html.titulo, url=url_final)
+        motivo = motivo_rechazo(html.texto, es_lista=es_lista, titulo=html.titulo, url=url_final)
         if motivo is not None:
             self.bd.registrar_bitacora(
                 dominio=dominio, url_origen=origen, url_destino=url_final,

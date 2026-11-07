@@ -15,9 +15,16 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from urllib.parse import urldefrag, urljoin
+from urllib.parse import unquote, urldefrag, urljoin, urlsplit
 
-from .configuracion import DENSIDAD_MINIMA, MINIMO_CARACTERES
+from .configuracion import (
+    DENSIDAD_MINIMA,
+    DENSIDAD_MINIMA_LISTA,
+    MINIMO_CARACTERES,
+    MINIMO_CARACTERES_LISTA,
+    PALABRAS_MINIMAS,
+    PALABRAS_MINIMAS_LISTA,
+)
 
 # Todo lo que está dentro de estas etiquetas se descarta: código o maquetación.
 ETIQUETAS_IGNORADAS = frozenset(
@@ -38,6 +45,39 @@ ETIQUETAS_BLOQUE = frozenset(
 )  # fmt: skip
 
 _ESPACIOS = re.compile(r"[ \t\f\v\r\u00a0]+")
+_PATRON_ARTEFACTOS = re.compile(r"^(?:Apariencia\s*\n+)+", re.IGNORECASE)
+_PATRON_PALABRA = re.compile(r"[^\W_]{2,}", re.UNICODE)
+_TERMINOS_DESAMBIGUACION = (
+    "(desambiguación)",
+    "(desambiguacion)",
+    "(disambiguation)",
+    "_desambiguación",
+    "_desambiguacion",
+    "_disambiguation",
+)
+_PATRONES_DESAMBIGUACION_TEXTO = (
+    "puede referirse a:",
+    "pueden referirse a:",
+    "puede hacer referencia a:",
+    "pueden hacer referencia a:",
+    "may refer to:",
+    "página de desambiguación",
+    "pagina de desambiguacion",
+    "disambiguation page",
+    "esta es una página de desambiguación",
+    "esta es una pagina de desambiguacion",
+)
+_INDICADORES_LISTA = frozenset(
+    {
+        "anime", "archive", "archives", "catalog", "category", "categories",
+        "coleccion", "directorio", "episodes", "films", "index", "lista",
+        "list", "lists", "main", "movies", "plots", "portal", "series", "shows",
+    }
+)
+_ENTRADA_LISTA = re.compile(
+    r"^(?:(?:\d+|[a-zivx]+)[.)]|[•▪◦*-])\s+|.{2,160}?\s+[—–|]\s+.{2,}$",
+    re.IGNORECASE | re.UNICODE,
+)
 
 
 @dataclass(slots=True)
@@ -128,7 +168,8 @@ def limpiar_texto(texto: str) -> str:
     for linea in lineas:
         if linea or (salida and salida[-1]):
             salida.append(linea)
-    return "\n".join(salida).strip()
+    resultado = "\n".join(salida).strip()
+    return _PATRON_ARTEFACTOS.sub("", resultado).strip()
 
 
 def analizar_html(html: str, url_base: str) -> ResultadoHTML:
@@ -155,17 +196,84 @@ def directivas_de_cabecera(valor: str) -> set[str]:
     return {d.strip().lower() for d in valor.replace(";", ",").split(",") if d.strip()}
 
 
-def motivo_rechazo(texto: str) -> str | None:
+def es_desambiguacion(texto: str, *, titulo: str = "", url: str = "") -> bool:
+    """Identifica páginas de desambiguación por URL, título o texto."""
+    if url:
+        url_decodificada = unquote(url).lower()
+        if any(termino in url_decodificada for termino in _TERMINOS_DESAMBIGUACION):
+            return True
+    if titulo:
+        titulo_lower = titulo.lower()
+        if any(termino in titulo_lower for termino in _TERMINOS_DESAMBIGUACION):
+            return True
+    lineas_inicio = [linea.strip().lower() for linea in texto.splitlines()[:10] if linea.strip()]
+    texto_inicio = " ".join(lineas_inicio)
+    return any(patron in texto_inicio for patron in _PATRONES_DESAMBIGUACION_TEXTO)
+
+
+def es_lista_probable(texto: str, *, titulo: str = "", url: str = "") -> bool:
+    """Identifica páginas con estructura preponderante de catálogo o lista."""
+    ruta = unquote(urlsplit(url).path).lower() if url else ""
+    nombre_ruta = ruta.rsplit("/", maxsplit=1)[-1]
+    palabras_ruta = set(re.findall(r"[a-záéíóúüñ]+", nombre_ruta.replace("_", " ")))
+    pistas_texto = titulo.strip().lower()
+    palabras_contexto = set(re.findall(r"[a-záéíóúüñ]+", pistas_texto))
+    pista_semantica = bool(palabras_ruta & _INDICADORES_LISTA) or bool(
+        palabras_contexto & _INDICADORES_LISTA
+    )
+
+    lineas = [linea.strip() for linea in texto.splitlines() if linea.strip()]
+    if len(lineas) < 3:
+        return False
+
+    candidatas = [
+        linea
+        for linea in lineas
+        if len(linea) <= 300
+        and sum(caracter.isalnum() for caracter in linea) >= 3
+        and _ENTRADA_LISTA.search(linea) is not None
+    ]
+    lineas_con_contenido = [
+        linea
+        for linea in lineas
+        if len(linea) <= 300 and sum(caracter.isalnum() for caracter in linea) >= 3
+    ]
+    proporcion = len(candidatas) / len(lineas)
+    proporcion_contenido = len(lineas_con_contenido) / len(lineas)
+    return (
+        (pista_semantica and len(candidatas) >= 2)
+        or (pista_semantica and proporcion_contenido >= 0.60)
+        or (len(candidatas) >= 3 and proporcion >= 0.45)
+    )
+
+
+def motivo_rechazo(
+    texto: str,
+    *,
+    es_lista: bool = False,
+    titulo: str = "",
+    url: str = "",
+) -> str | None:
     """Política de calidad textual, igual que la tubería de validación de Scrapy.
 
     Devuelve ``None`` si el texto sirve, o el motivo del rechazo.
-    Densidad = caracteres alfanuméricos / caracteres visibles (sin espacios).
     """
+    if es_desambiguacion(texto, titulo=titulo, url=url):
+        return "desambiguacion"
 
-    if len(texto) < MINIMO_CARACTERES:
-        return f"longitud {len(texto)} < {MINIMO_CARACTERES}"
+    caracteres_min = MINIMO_CARACTERES_LISTA if es_lista else MINIMO_CARACTERES
+    palabras_min = PALABRAS_MINIMAS_LISTA if es_lista else PALABRAS_MINIMAS
+    densidad_min = DENSIDAD_MINIMA_LISTA if es_lista else DENSIDAD_MINIMA
+
+    if len(texto) < caracteres_min:
+        return f"longitud {len(texto)} < {caracteres_min}"
+
+    palabras = len(_PATRON_PALABRA.findall(texto))
+    if palabras < palabras_min:
+        return f"palabras {palabras} < {palabras_min}"
+
     visibles = [c for c in texto if not c.isspace()]
     densidad = sum(c.isalnum() for c in visibles) / len(visibles) if visibles else 0.0
-    if densidad < DENSIDAD_MINIMA:
-        return f"densidad {densidad:.0%} < {DENSIDAD_MINIMA:.0%}"
+    if densidad < densidad_min:
+        return f"densidad {densidad:.0%} < {densidad_min:.0%}"
     return None

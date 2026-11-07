@@ -619,3 +619,116 @@ def test_filtro_duplicados_asigna_prioridad_bfs_segun_profundidad(tmp_path: Path
         assert req_d2.priority == -20
     finally:
         filtro.close("finished")
+
+
+def test_arana_rechaza_urls_administrativas_y_query_actions() -> None:
+    """Verifica que es_url_permitida rechace namespaces administrativos y query actions."""
+    araña = AranaSemillas()
+
+    urls_rechazadas = [
+        "https://es.wikipedia.org/wiki/Especial:CambiosRecientes",
+        "https://es.wikipedia.org/wiki/Special:WhatLinksHere",
+        "https://es.wikipedia.org/wiki/Discusi%C3%B3n:Anime",
+        "https://es.wikipedia.org/wiki/Talk:Film",
+        "https://es.wikipedia.org/wiki/Usuario:Ejemplo",
+        "https://es.wikipedia.org/wiki/User:Example",
+        "https://es.wikipedia.org/wiki/Usuaria:Ejemplo",
+        "https://es.wikipedia.org/wiki/Plantilla:Ficha_de_serie",
+        "https://es.wikipedia.org/wiki/Template:Infobox",
+        "https://es.wikipedia.org/wiki/Ayuda:Tutorial",
+        "https://es.wikipedia.org/wiki/Help:Contents",
+        "https://es.wikipedia.org/wiki/Wikiproyecto:Cine",
+        "https://es.wikipedia.org/wiki/Archivo:Foto.jpg",
+        "https://es.wikipedia.org/wiki/File:Picture.png",
+        "https://es.wikipedia.org/wiki/MediaWiki:Common.css",
+        "https://es.wikipedia.org/w/index.php?title=Anime&action=edit",
+        "https://es.wikipedia.org/w/index.php?title=Anime&action=history",
+        "https://es.wikipedia.org/w/index.php?title=Anime&diff=123&oldid=456",
+        "https://tvtropes.org/pmwiki/pmwiki.php/Discussion/Film",
+        "https://tvtropes.org/pmwiki/pmwiki.php/Administrivia/Film",
+        "https://tvtropes.org/pmwiki/pmwiki.php/SugarWiki/Film",
+        "https://tvtropes.org/pmwiki/pmwiki.php/YMMV/Film",
+    ]
+
+    for url in urls_rechazadas:
+        assert not araña.es_url_permitida(url), f"La URL {url} debió ser rechazada"
+
+    # URLs documentales y hubs que SÍ deben permitirse
+    urls_permitidas = [
+        "https://es.wikipedia.org/wiki/Neon_Genesis_Evangelion",
+        "https://es.wikipedia.org/wiki/Categor%C3%ADa:Series_de_anime",
+        "https://es.wikipedia.org/wiki/Portal:Cine",
+        "https://tvtropes.org/pmwiki/pmwiki.php/Main/Film",
+    ]
+    for url in urls_permitidas:
+        assert araña.es_url_permitida(url), f"La URL {url} debió ser permitida"
+
+
+def test_arana_detecta_paginas_hub_y_no_crea_documento_pero_sigue_enlaces() -> None:
+    """Las páginas hub (categorías, portales, desambiguaciones) no guardan documento pero sí siguen enlaces."""
+    araña = AranaSemillas()
+
+    # Detección estática
+    assert araña.es_pagina_hub("https://es.wikipedia.org/wiki/Categor%C3%ADa:Series_de_anime")
+    assert araña.es_pagina_hub("https://es.wikipedia.org/wiki/Category:Anime_series")
+    assert araña.es_pagina_hub("https://es.wikipedia.org/wiki/Portal:Cine")
+    assert araña.es_pagina_hub("https://es.wikipedia.org/wiki/Matrix_(desambiguaci%C3%B3n)")
+    assert araña.es_pagina_hub("https://es.wikipedia.org/wiki/Alien", titulo="Alien (desambiguación)")
+    assert not araña.es_pagina_hub("https://es.wikipedia.org/wiki/Interstellar", titulo="Interstellar")
+
+    # En parse(): no debe producir DocumentoItem pero sí Requests
+    html_categoria = """
+    <html><head><title>Categoría:Series de anime</title></head>
+    <body>
+      <div id="mw-content-text">
+        <a href="/wiki/Evangelion">Evangelion</a>
+        <a href="/wiki/Cowboy_Bebop">Cowboy Bebop</a>
+      </div>
+    </body></html>
+    """
+    respuesta = HtmlResponse(
+        url="https://es.wikipedia.org/wiki/Categor%C3%ADa:Series_de_anime",
+        body=html_categoria.encode("utf-8"),
+        encoding="utf-8",
+        status=200,
+        request=Request("https://es.wikipedia.org/wiki/Categor%C3%ADa:Series_de_anime"),
+    )
+
+    resultados = list(araña.parse(respuesta))
+    items = [r for r in resultados if isinstance(r, DocumentoItem)]
+    solicitudes = [r for r in resultados if isinstance(r, Request)]
+
+    assert len(items) == 0, "No debe generarse un DocumentoItem para una página hub"
+    assert len(solicitudes) == 2, "Deben generarse Requests para los enlaces del hub"
+    assert {s.url for s in solicitudes} == {
+        "https://es.wikipedia.org/wiki/Evangelion",
+        "https://es.wikipedia.org/wiki/Cowboy_Bebop",
+    }
+
+
+def test_arana_restringe_enlaces_en_wikipedia_al_contenido() -> None:
+    """En Wikipedia los enlaces se extraen preferentemente del contenedor de contenido."""
+    araña = AranaSemillas()
+
+    html = """
+    <html><body>
+      <div id="mw-navigation">
+        <a href="https://es.wikipedia.org/wiki/Enlace_Menu">Menú</a>
+      </div>
+      <div id="mw-content-text">
+        <a href="https://es.wikipedia.org/wiki/Articulo_Contenido">Artículo</a>
+      </div>
+    </body></html>
+    """
+    respuesta = HtmlResponse(
+        url="https://es.wikipedia.org/wiki/Articulo_Prueba",
+        body=html.encode("utf-8"),
+        encoding="utf-8",
+        status=200,
+        request=Request("https://es.wikipedia.org/wiki/Articulo_Prueba"),
+    )
+
+    solicitudes = [r for r in araña.parse(respuesta) if isinstance(r, Request)]
+    urls = {s.url for s in solicitudes}
+    assert "https://es.wikipedia.org/wiki/Articulo_Contenido" in urls
+    assert "https://es.wikipedia.org/wiki/Enlace_Menu" not in urls

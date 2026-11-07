@@ -14,9 +14,15 @@ from pathlib import Path
 
 import pytest
 
-from propio.arana import Arana
+from propio.arana import Arana, es_pagina_hub
 from propio.bd import BaseDatos
-from propio.extraccion import analizar_html, motivo_rechazo
+from propio.extraccion import (
+    analizar_html,
+    es_desambiguacion,
+    es_lista_probable,
+    limpiar_texto,
+    motivo_rechazo,
+)
 
 PARRAFO = "<p>" + "El guion describe la escena del agujero negro con mucho detalle. " * 10 + "</p>"
 DOBLE = "<p>" + "Este texto aparece en dos direcciones distintas del mismo sitio. " * 10 + "</p>"
@@ -37,9 +43,19 @@ SITIO: dict[str, tuple[int, str, str]] = {
         <a href="/a">a</a> <a href="/privado/x">p</a> <a href="/noindex">n</a>
         <a href="/nofollow">nf</a> <a href="/corta">c</a> <a href="/archivo.pdf">pdf</a>
         <a href="https://externo.com/x">ext</a> <a href="/dup1">d1</a> <a href="/dup2">d2</a>
-        <a href="/inestable">i</a> <a href="/a#seccion">a otra vez</a>"""
+        <a href="/inestable">i</a> <a href="/a#seccion">a otra vez</a>
+        <a href="/wiki/Portal:Cine">hub</a>"""
         ),
     ),
+    "/wiki/Portal:Cine": (
+        200,
+        "text/html",
+        pagina(
+            PARRAFO.replace("detalle", "detalle Hub")
+            + '<a href="/desde-hub">dh</a>'
+        ),
+    ),
+    "/desde-hub": (200, "text/html", pagina(PARRAFO.replace("detalle", "detalle DH"))),
     "/a": (
         200,
         "text/html",
@@ -131,6 +147,8 @@ def test_recorrido_completo_respeta_politicas(servidor: str, tmp_path: Path) -> 
     assert "/oculta" not in VISITAS  # nofollow
     assert "/desde-noindex" in guardadas  # noindex sí deja seguir enlaces...
     assert "/noindex" not in guardadas  # ...pero no guarda la página
+    assert "/desde-hub" in guardadas  # páginas hub sí dejan seguir enlaces...
+    assert "/wiki/Portal:Cine" not in guardadas  # ...pero no guardan documento
     assert "/corta" not in guardadas  # calidad textual
     assert "/inestable" in guardadas  # reintento tras 503
     assert len({"/dup1", "/dup2"} & guardadas) == 1  # duplicado por contenido
@@ -151,3 +169,87 @@ def test_recorrido_completo_respeta_politicas(servidor: str, tmp_path: Path) -> 
     texto = (tmp_path / "repositorio" / next(iter(rutas))).read_text()
     assert "<" not in texto and "var x" not in texto
     bd.cerrar()
+
+
+def test_motivo_rechazo_palabras_desambiguacion_y_listas() -> None:
+    # 1. Desambiguación
+    assert es_desambiguacion("texto", url="https://es.wikipedia.org/wiki/X_(desambiguación)")
+    assert motivo_rechazo("Página normal con suficiente texto", url="https://es.wikipedia.org/wiki/X_(desambiguación)") == "desambiguacion"
+    assert motivo_rechazo("Página normal con suficiente texto", titulo="X (disambiguation)") == "desambiguacion"
+    assert motivo_rechazo("X puede referirse a:\n1. Primera acepción\n2. Segunda acepción") == "desambiguacion"
+
+    # 2. Conteo de palabras en texto estándar
+    texto_largo_pocas_palabras = "palabra " * 40 + "x" * 500  # > 500 caracteres pero < 100 palabras
+    motivo = motivo_rechazo(texto_largo_pocas_palabras)
+    assert motivo is not None and "palabras" in motivo
+
+    # 3. Listas
+    lista_corta = "1. Uno\n2. Dos\n3. Tres"
+    assert motivo_rechazo(lista_corta, es_lista=True) is not None  # < 300 caracteres
+
+    lista_valida = (
+        "1. Casablanca - Drama clásico dirigido por Michael Curtiz con Humphrey Bogart y Bergman.\n"
+        "2. Citizen Kane - Obra maestra de Orson Welles sobre el magnate de medios Charles Foster Kane.\n"
+        "3. Vertigo - Suspense psicológico de Alfred Hitchcock ambientado en San Francisco California.\n"
+        "4. Metropolis - Película de ciencia ficción expresionista alemana dirigida por Fritz Lang en 1927.\n"
+        "5. Seven Samurai - Épico drama japonés de época histórica dirigido por Akira Kurosawa en Japón."
+    )
+    assert es_lista_probable(lista_valida, titulo="Movies", url="https://example.com/movies")
+    assert motivo_rechazo(lista_valida, es_lista=True) is None
+
+
+def test_limpiar_texto_quita_artefacto_apariencia() -> None:
+    sucio = "Apariencia\n\nApariencia\n\nTexto principal de la película con contenido útil."
+    limpio = limpiar_texto(sucio)
+    assert not limpio.startswith("Apariencia")
+    assert limpio.startswith("Texto principal")
+
+
+def test_url_aceptable_excluye_urls_administrativas_y_query_actions(tmp_path: Path) -> None:
+    bd = BaseDatos(tmp_path / "test.db")
+    arana = Arana(
+        semillas=["https://es.wikipedia.org/wiki/Portal:Cine", "https://tvtropes.org/pmwiki/pmwiki.php/Main/Film"],
+        base_datos=bd,
+    )
+
+    rechazadas = [
+        "https://es.wikipedia.org/wiki/Especial:CambiosRecientes",
+        "https://es.wikipedia.org/wiki/Special:WhatLinksHere",
+        "https://es.wikipedia.org/wiki/Discusi%C3%B3n:Anime",
+        "https://es.wikipedia.org/wiki/Talk:Film",
+        "https://es.wikipedia.org/wiki/Usuario:Mau",
+        "https://es.wikipedia.org/wiki/User:Mau",
+        "https://es.wikipedia.org/wiki/Plantilla:Infobox",
+        "https://es.wikipedia.org/wiki/Template:Infobox",
+        "https://es.wikipedia.org/wiki/Ayuda:Ayuda",
+        "https://es.wikipedia.org/wiki/Wikiproyecto:Cine",
+        "https://es.wikipedia.org/wiki/Archivo:Foto.jpg",
+        "https://es.wikipedia.org/wiki/MediaWiki:Common.css",
+        "https://es.wikipedia.org/w/index.php?title=Anime&action=edit",
+        "https://es.wikipedia.org/w/index.php?title=Anime&diff=1&oldid=2",
+        "https://tvtropes.org/pmwiki/pmwiki.php/Discussion/Film",
+        "https://tvtropes.org/pmwiki/pmwiki.php/Administrivia/Film",
+        "https://tvtropes.org/pmwiki/pmwiki.php/SugarWiki/Film",
+        "https://tvtropes.org/pmwiki/pmwiki.php/YMMV/Film",
+    ]
+    for url in rechazadas:
+        assert not arana.url_aceptable(url), f"Se debió rechazar {url}"
+
+    permitidas = [
+        "https://es.wikipedia.org/wiki/Portal:Cine",
+        "https://es.wikipedia.org/wiki/Categor%C3%ADa:Series_de_anime",
+        "https://es.wikipedia.org/wiki/Neon_Genesis_Evangelion",
+        "https://tvtropes.org/pmwiki/pmwiki.php/Main/Film",
+    ]
+    for url in permitidas:
+        assert arana.url_aceptable(url), f"Se debió permitir {url}"
+    bd.cerrar()
+
+
+def test_es_pagina_hub_y_comportamiento_arana(tmp_path: Path) -> None:
+    assert es_pagina_hub("https://es.wikipedia.org/wiki/Categor%C3%ADa:Series_de_anime")
+    assert es_pagina_hub("https://es.wikipedia.org/wiki/Category:Anime")
+    assert es_pagina_hub("https://es.wikipedia.org/wiki/Portal:Cine")
+    assert es_pagina_hub("https://es.wikipedia.org/wiki/Matrix_(desambiguaci%C3%B3n)")
+    assert es_pagina_hub("https://es.wikipedia.org/wiki/Alien", titulo="Alien (desambiguación)")
+    assert not es_pagina_hub("https://es.wikipedia.org/wiki/Neon_Genesis_Evangelion", titulo="Evangelion")

@@ -11,6 +11,7 @@ from threading import Lock
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from scrapy import Request, signals
 from scrapy.exceptions import DropItem
 from scrapy.settings import Settings
@@ -90,7 +91,10 @@ def _documento(
     texto: str | None = None,
     categoria: str = "analisis",
 ) -> dict[str, Any]:
-    contenido = texto or ("Un análisis cinematográfico detallado. " * 20)
+    contenido = texto or (
+        "Un análisis cinematográfico detallado y exhaustivo de la obra audiovisual contemporánea. "
+        * 15
+    )
     return {
         "url": url,
         "dominio": "example.com",
@@ -109,7 +113,7 @@ def test_documento_item_declara_todos_los_campos_del_plan() -> None:
 
 def test_validacion_normaliza_esquema_y_calcula_hashes() -> None:
     fecha = datetime(2026, 1, 2, 3, 4, 5)
-    tubería = TuberiaValidacion(caracteres_minimos=10)
+    tubería = TuberiaValidacion(caracteres_minimos=10, palabras_minimas=2)
 
     resultado = tubería.process_item(
         {
@@ -155,7 +159,15 @@ def test_validacion_rechaza_esquema_tipo_extension_y_densidad() -> None:
 
 
 def test_validacion_conserva_una_lista_corta_legitima() -> None:
-    tubería = TuberiaValidacion(caracteres_minimos=300, densidad_minima=0.8)
+    tubería = TuberiaValidacion(caracteres_minimos=500, caracteres_minimos_lista=300, palabras_minimas_lista=50, densidad_minima=0.8)
+
+    texto_lista = (
+        "1. Casablanca - Drama clásico dirigido por Michael Curtiz con Humphrey Bogart y Bergman.\n"
+        "2. Citizen Kane - Obra maestra de Orson Welles sobre el magnate de medios Charles Foster Kane.\n"
+        "3. Vertigo - Suspense psicológico de Alfred Hitchcock ambientado en San Francisco California.\n"
+        "4. Metropolis - Película de ciencia ficción expresionista alemana dirigida por Fritz Lang en 1927.\n"
+        "5. Seven Samurai - Épico drama japonés de época histórica dirigido por Akira Kurosawa en Japón."
+    )
 
     resultado = tubería.process_item(
         {
@@ -164,7 +176,7 @@ def test_validacion_conserva_una_lista_corta_legitima() -> None:
             "categoria": "catalogo",
             "codigo_http": 200,
             "profundidad": 0,
-            "texto": "Movie One\nMovie Two\nMovie Three",
+            "texto": texto_lista,
         }
     )
 
@@ -452,3 +464,90 @@ def test_reexports_de_conexion_y_repositorio_son_operativos(tmp_path: Path) -> N
     finally:
         repositorio.cerrar()
         conexion.cerrar()
+
+
+def test_validacion_descarta_desambiguaciones() -> None:
+    """Descarta páginas de desambiguación identificadas por URL, título o texto."""
+    tubería = TuberiaValidacion(caracteres_minimos=10, palabras_minimas=5)
+
+    # 1. Por URL con (desambiguación)
+    item_url = _documento(
+        url="https://example.com/Avatar_(desambiguaci%C3%B3n)",
+        texto="Texto extenso de prueba cinematográfica que describe opciones posibles en la filmografía. " * 5,
+    )
+    with pytest.raises(DropItem, match="desambiguación"):
+        tubería.process_item(item_url)
+
+    # 2. Por título con (disambiguation)
+    item_titulo = _documento(
+        url="https://example.com/matrix",
+        texto="Texto extenso de prueba cinematográfica que describe opciones posibles en la filmografía. " * 5,
+    )
+    item_titulo["titulo"] = "Matrix (disambiguation)"
+    with pytest.raises(DropItem, match="desambiguación"):
+        tubería.process_item(item_titulo)
+
+    # 3. Por encabezado o frase típica en el texto inicial
+    item_texto = _documento(
+        url="https://example.com/dune",
+        texto="Dune puede referirse a:\n- Novela de Frank Herbert.\n- Película de 1984 de David Lynch.\n- Película de 2021 de Denis Villeneuve.\n" * 5,
+    )
+    item_texto["titulo"] = "Dune"
+    with pytest.raises(DropItem, match="desambiguación"):
+        tubería.process_item(item_texto)
+
+
+def test_validacion_limpia_artefactos_iniciales_apariencia() -> None:
+    """Limpia artefactos de interfaz como 'Apariencia\\n\\n' al inicio del texto."""
+    tubería = TuberiaValidacion(caracteres_minimos=50, palabras_minimas=10)
+    cuerpo_util = "Una película cinematográfica imprescindible con análisis de dirección y guion dramático. " * 5
+    item = _documento(
+        url="https://example.com/cine",
+        texto=f"Apariencia\n\nApariencia\n\n{cuerpo_util}",
+    )
+    resultado = tubería.process_item(item)
+    assert not resultado["texto"].startswith("Apariencia")
+    assert resultado["texto"].startswith("Una película cinematográfica")
+
+
+def test_validacion_exige_palabras_y_caracteres_minimos_en_listas_y_estandar() -> None:
+    """Valida umbrales de palabras y caracteres tanto en texto estándar como en listas reconocidas."""
+    tubería = TuberiaValidacion(
+        caracteres_minimos=500,
+        caracteres_minimos_lista=300,
+        palabras_minimas=100,
+        palabras_minimas_lista=50,
+        densidad_minima=0.35,
+        densidad_minima_lista=0.15,
+    )
+
+    # Texto estándar con menos de 100 palabras (pero > 500 caracteres) debe fallar
+    texto_pocas_palabras = "palabra " * 80 + "x" * 200
+    with pytest.raises(DropItem, match="palabras"):
+        tubería.process_item(_documento(texto=texto_pocas_palabras))
+
+    # Lista con menos de 300 caracteres debe fallar (no hay exoneración total)
+    lista_corta = {
+        "url": "https://example.com/films-index",
+        "titulo": "Films Index",
+        "categoria": "catalogo",
+        "codigo_http": 200,
+        "profundidad": 0,
+        "texto": "1. Alien\n2. Blade Runner\n3. Tron",
+    }
+    with pytest.raises(DropItem, match="caracteres"):
+        tubería.process_item(lista_corta)
+
+    # Lista con >= 300 caracteres pero menos de 50 palabras debe fallar
+    lineas_pocas_palabras = "\n".join(f"{i}. Corto - Item {i}" for i in range(1, 10))
+    lineas_pocas_palabras += "\n" + "A" * 250  # para sumar caracteres
+    lista_insuficiente_palabras = {
+        "url": "https://example.com/films-catalog",
+        "titulo": "Catalog",
+        "categoria": "catalogo",
+        "codigo_http": 200,
+        "profundidad": 0,
+        "texto": lineas_pocas_palabras,
+    }
+    with pytest.raises(DropItem, match="palabras"):
+        tubería.process_item(lista_insuficiente_palabras)
