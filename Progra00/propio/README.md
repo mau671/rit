@@ -40,7 +40,7 @@ uv run pytest
 | Límite de profundidad | Selección | 4 saltos | `Arana.encolar`, `Arana._procesar` (paso 5) |
 | Exclusión de binarios | Selección | 49 extensiones + `Content-Type` HTML | `Arana.url_aceptable`, `Respuesta.es_html` |
 | Tamaño y largo de URL | Selección | 5 MB, 2048 caracteres | `Descargador._descargar_con_turno`, `Arana.url_aceptable` |
-| Calidad textual | Selección | 300 caracteres, 35 % alfanumérico | `extraccion.motivo_rechazo` |
+| Calidad textual | Selección | 500 caracteres y 100 palabras; listas: 300 y 50; 35 % / 15 % alfanumérico | `extraccion.motivo_rechazo` |
 | Recorrido en amplitud | Selección | Prioridad = profundidad | `Arana.frontera` (`PriorityQueue`) |
 | robots.txt | Cortesía | Obligatorio, incluye `Crawl-delay` | `Descargador.permitido_por_robots` |
 | meta robots / X-Robots-Tag | Cortesía | noindex, nofollow, none | `extraccion._Analizador`, `Arana._procesar` pasos 5 y 6 |
