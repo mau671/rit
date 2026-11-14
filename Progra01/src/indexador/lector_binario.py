@@ -15,6 +15,7 @@ from bisect import bisect_left
 from pathlib import Path
 from typing import BinaryIO, Self
 
+from .configuracion import ConfiguracionNormalizacion
 from .formato_binario import (
     MAGIC_BYTES,
     TAMANO_DOCUMENTO,
@@ -50,7 +51,9 @@ class LectorIndiceBinario:
     def abrir(self) -> None:
         """Abre el archivo en modo binario de sólo lectura y valida el encabezado."""
         if not self.ruta_archivo.is_file():
-            raise FileNotFoundError(f"Archivo de índice no encontrado: {self.ruta_archivo}")
+            raise FileNotFoundError(
+                f"Archivo de índice no encontrado: {self.ruta_archivo}"
+            )
 
         self._archivo = open(self.ruta_archivo, "rb")  # noqa: SIM115
         self._leer_encabezado()
@@ -71,11 +74,15 @@ class LectorIndiceBinario:
         f.seek(0, io.SEEK_SET)
         buffer = f.read(TAMANO_ENCABEZADO)
         if len(buffer) < TAMANO_ENCABEZADO:
-            raise ValueError(f"Archivo truncado: no contiene los {TAMANO_ENCABEZADO} bytes de encabezado.")
+            raise ValueError(
+                f"Archivo truncado: no contiene los {TAMANO_ENCABEZADO} bytes de encabezado."
+            )
 
         self._encabezado = EncabezadoIndice.desempaquetar(buffer)
         if self._encabezado.magic != MAGIC_BYTES:
-            raise ValueError(f"Magic bytes inválidos: {self._encabezado.magic!r} != {MAGIC_BYTES!r}")
+            raise ValueError(
+                f"Magic bytes inválidos: {self._encabezado.magic!r} != {MAGIC_BYTES!r}"
+            )
         if self._encabezado.version != VERSION_FORMATO_ACTUAL:
             raise ValueError(
                 f"Versión de formato no soportada: {self._encabezado.version} "
@@ -90,6 +97,86 @@ class LectorIndiceBinario:
             return self._leer_encabezado()
         return self._encabezado
 
+    @property
+    def normalizacion(self) -> ConfiguracionNormalizacion:
+        """Reconstruye la normalización con la que se construyó este índice.
+
+        Sale de la máscara ``flags_normalizacion`` del encabezado, por lo que una
+        consulta puede tokenizarse igual que los documentos sin depender de qué
+        archivo ``.conf`` se usó al indexar.
+        """
+        return ConfiguracionNormalizacion.desde_flags(
+            self.encabezado.flags_normalizacion
+        )
+
+    def verificar_estructura(self) -> list[str]:
+        """Comprueba la coherencia interna del archivo y devuelve los problemas.
+
+        Una lista vacía significa que los offsets del encabezado, el orden del
+        vocabulario y los bloques de postings son consistentes con el tamaño real
+        del archivo. Se usa en ``inspeccionar --verificar`` y en las pruebas.
+        """
+        problemas: list[str] = []
+        enc = self.encabezado
+        tamano_total = self.ruta_archivo.stat().st_size
+
+        esperado_docs = TAMANO_ENCABEZADO
+        if enc.offset_docs != esperado_docs:
+            problemas.append(
+                f"offset_docs={enc.offset_docs} debería ser {esperado_docs}"
+            )
+
+        esperado_dicc = enc.offset_docs + enc.total_docs * TAMANO_DOCUMENTO
+        if enc.offset_diccionario != esperado_dicc:
+            problemas.append(
+                f"offset_diccionario={enc.offset_diccionario} debería ser {esperado_dicc}"
+            )
+
+        if not enc.offset_diccionario <= enc.offset_postings <= tamano_total:
+            problemas.append("los offsets del encabezado están fuera del archivo")
+
+        dicc = self.cargar_diccionario()
+        if len(dicc) != enc.total_terminos:
+            problemas.append(
+                f"el diccionario tiene {len(dicc)} términos y el encabezado declara "
+                f"{enc.total_terminos}"
+            )
+
+        anterior: str | None = None
+        offset_esperado = enc.offset_postings
+        postings_contados = 0
+        for entrada in dicc:
+            if anterior is not None and entrada.termino <= anterior:
+                problemas.append(f"vocabulario desordenado en {entrada.termino!r}")
+                break
+            anterior = entrada.termino
+
+            if entrada.offset_postings != offset_esperado:
+                problemas.append(
+                    f"hueco de postings en {entrada.termino!r}: esperado "
+                    f"{offset_esperado}, declarado {entrada.offset_postings}"
+                )
+                break
+            if entrada.bytes_postings % TAMANO_POSTING != 0:
+                problemas.append(
+                    f"el bloque de {entrada.termino!r} no es múltiplo de {TAMANO_POSTING} bytes"
+                )
+                break
+            offset_esperado += entrada.bytes_postings
+            postings_contados += entrada.bytes_postings // TAMANO_POSTING
+
+        if offset_esperado != tamano_total:
+            problemas.append(
+                f"los postings terminan en {offset_esperado} y el archivo mide {tamano_total}"
+            )
+        if postings_contados != enc.total_postings:
+            problemas.append(
+                f"se contaron {postings_contados} postings y el encabezado declara "
+                f"{enc.total_postings}"
+            )
+
+        return problemas
+
     # --------------------------------------------------------------------------
     # Acceso a Documentos y Normas
     # --------------------------------------------------------------------------
@@ -99,13 +186,17 @@ class LectorIndiceBinario:
         enc = self.encabezado
 
         if doc_id < 0 or doc_id >= enc.total_docs:
-            raise IndexError(f"doc_id {doc_id} fuera de rango [0, {enc.total_docs - 1}]")
+            raise IndexError(
+                f"doc_id {doc_id} fuera de rango [0, {enc.total_docs - 1}]"
+            )
 
         offset_doc = enc.offset_docs + (doc_id * TAMANO_DOCUMENTO)
         f.seek(offset_doc, io.SEEK_SET)
         buffer = f.read(TAMANO_DOCUMENTO)
         if len(buffer) < TAMANO_DOCUMENTO:
-            raise ValueError(f"No se pudieron leer los {TAMANO_DOCUMENTO} bytes del doc_id {doc_id}")
+            raise ValueError(
+                f"No se pudieron leer los {TAMANO_DOCUMENTO} bytes del doc_id {doc_id}"
+            )
 
         return EntradaDocumento.desempaquetar(buffer)
 
@@ -121,7 +212,9 @@ class LectorIndiceBinario:
         docs: list[EntradaDocumento] = []
         for i in range(enc.total_docs):
             pos = i * TAMANO_DOCUMENTO
-            docs.append(EntradaDocumento.desempaquetar(buffer[pos : pos + TAMANO_DOCUMENTO]))
+            docs.append(
+                EntradaDocumento.desempaquetar(buffer[pos : pos + TAMANO_DOCUMENTO])
+            )
         return docs
 
     # --------------------------------------------------------------------------
@@ -142,7 +235,9 @@ class LectorIndiceBinario:
         terminos: list[EntradaTermino] = []
         pos = 0
         while pos < len(buffer) and len(terminos) < enc.total_terminos:
-            entrada, tamano = EntradaTermino.desempaquetar_desde_bytes(buffer, offset=pos)
+            entrada, tamano = EntradaTermino.desempaquetar_desde_bytes(
+                buffer, offset=pos
+            )
             terminos.append(entrada)
             pos += tamano
 
@@ -162,6 +257,31 @@ class LectorIndiceBinario:
         if idx < len(self._terminos_claves) and self._terminos_claves[idx] == termino:
             return self._diccionario_en_memoria[idx]
         return None
+
+    def terminos_con_prefijo(
+        self, prefijo: str, limite: int = 10
+    ) -> list[EntradaTermino]:
+        """Devuelve hasta ``limite`` términos del vocabulario que empiezan por ``prefijo``.
+
+        Sirve para sugerir variantes cuando la consulta no coincide por completo,
+        por ejemplo al escribir "interstelar" en un corpus con "interstellar".
+        """
+        if not prefijo:
+            return []
+        if self._diccionario_en_memoria is None:
+            self.cargar_diccionario()
+
+        assert self._terminos_claves is not None
+        assert self._diccionario_en_memoria is not None
+
+        idx = bisect_left(self._terminos_claves, prefijo)
+        encontrados: list[EntradaTermino] = []
+        while idx < len(self._terminos_claves) and len(encontrados) < limite:
+            if not self._terminos_claves[idx].startswith(prefijo):
+                break
+            encontrados.append(self._diccionario_en_memoria[idx])
+            idx += 1
+        return encontrados
 
     # --------------------------------------------------------------------------
     # Acceso a Postings
@@ -207,16 +327,24 @@ class LectorIndiceBinario:
             lineas.append("=" * 70)
             lineas.append(f"INSPECCIÓN DEL ÍNDICE BINARIO: {lector.ruta_archivo.name}")
             lineas.append("=" * 70)
-            lineas.append(f"Tamaño total de archivo : {tamano_total} bytes (0x{tamano_total:08X})")
-            lineas.append(f"Magic Number             : {enc.magic.decode('ascii', errors='replace')} (OK)")
+            lineas.append(
+                f"Tamaño total de archivo : {tamano_total} bytes (0x{tamano_total:08X})"
+            )
+            lineas.append(
+                f"Magic Number             : {enc.magic.decode('ascii', errors='replace')} (OK)"
+            )
             lineas.append(f"Versión de formato       : {enc.version}")
-            lineas.append(f"Flags de normalización   : 0x{enc.flags_normalizacion:04X} ({enc.flags_normalizacion:016b})")
+            lineas.append(
+                f"Flags de normalización   : 0x{enc.flags_normalizacion:04X} ({enc.flags_normalizacion:016b})"
+            )
             lineas.append(f"Total Documentos (N)     : {enc.total_docs}")
             lineas.append(f"Total Vocabulario (|V|)  : {enc.total_terminos}")
             lineas.append(f"Total Postings           : {enc.total_postings}")
             lineas.append("-" * 70)
             lineas.append("DISTRIBUCIÓN DE SECCIONES EN DISCO:")
-            lineas.append(f"  [0x00000000 - 0x{TAMANO_ENCABEZADO:08X}] : Encabezado ({TAMANO_ENCABEZADO} bytes)")
+            lineas.append(
+                f"  [0x00000000 - 0x{TAMANO_ENCABEZADO:08X}] : Encabezado ({TAMANO_ENCABEZADO} bytes)"
+            )
             lineas.append(
                 f"  [0x{enc.offset_docs:08X} - 0x{enc.offset_diccionario:08X}] : "
                 f"Tabla Documentos ({enc.offset_diccionario - enc.offset_docs} bytes, "
@@ -235,7 +363,9 @@ class LectorIndiceBinario:
             lineas.append("-" * 70)
 
             # Muestra de documentos
-            lineas.append(f"MUESTRA DE DOCUMENTOS (primeros {min(num_muestras, enc.total_docs)}):")
+            lineas.append(
+                f"MUESTRA DE DOCUMENTOS (primeros {min(num_muestras, enc.total_docs)}):"
+            )
             for i in range(min(num_muestras, enc.total_docs)):
                 doc = lector.leer_documento(i)
                 hash_hex = doc.hash_url.hex()
@@ -247,14 +377,19 @@ class LectorIndiceBinario:
             lineas.append("-" * 70)
             # Muestra de vocabulario y postings
             dicc = lector.cargar_diccionario()
-            lineas.append(f"MUESTRA DE VOCABULARIO Y POSTINGS (primeros {min(num_muestras, len(dicc))}):")
+            lineas.append(
+                f"MUESTRA DE VOCABULARIO Y POSTINGS (primeros {min(num_muestras, len(dicc))}):"
+            )
             for t in dicc[:num_muestras]:
                 lineas.append(
                     f"  Término: '{t.termino}' | df={t.df} | idf={t.idf:.4f} | "
                     f"offset=0x{t.offset_postings:08X} | bytes={t.bytes_postings}"
                 )
                 postings = lector.leer_postings(t)
-                detalles_post = [f"(d:{p.doc_id}, tf:{p.tf}, w:{p.peso_tfidf:.3f})" for p in postings[:4]]
+                detalles_post = [
+                    f"(d:{p.doc_id}, tf:{p.tf}, w:{p.peso_tfidf:.3f})"
+                    for p in postings[:4]
+                ]
                 if len(postings) > 4:
                     detalles_post.append("...")
                 lineas.append(f"    -> Postings: {', '.join(detalles_post)}")

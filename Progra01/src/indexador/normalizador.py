@@ -468,3 +468,31 @@ class Normalizador:
     def iterar_tokens(self, texto: str) -> Iterator[str]:
         """Generador perezoso que produce los tokens normalizados uno a uno."""
         yield from self.normalizar_texto(texto)
+
+    def variantes_de_busqueda(self, token: str) -> list[str]:
+        """Devuelve el token y sus posibles reducciones en español e inglés.
+
+        La detección de idioma de una consulta corta es poco fiable: una sola
+        palabra en inglés no aporta votos de palabras vacías y termina reducida
+        con el stemmer español, lo que produce variantes que no existen en el
+        vocabulario (por ejemplo ``actors`` se queda igual en vez de ``actor``).
+        El buscador usa esta lista para probar, en orden, las variantes que sí
+        estén en el índice.
+        """
+        if not self.config.stemming:
+            return [token]
+        if token.startswith("<") and token.endswith(">"):
+            return [token]
+
+        variantes = [token]
+        for stemmer, cache in (
+            (self._stemmer_es, self._cache_stem_es),
+            (self._stemmer_en, self._cache_stem_en),
+        ):
+            reducido = cache.get(token)
+            if reducido is None:
+                reducido = stemmer.stemWord(token)
+                cache[token] = reducido
+            if reducido not in variantes:
+                variantes.append(reducido)
+        return variantes

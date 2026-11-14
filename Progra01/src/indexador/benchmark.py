@@ -10,12 +10,13 @@ Mide:
 
 from __future__ import annotations
 
-import resource
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from .configuracion import ConfiguracionIndexador
+from .memoria import memoria_pico_mb
+from .memoria import reiniciar_memoria_pico as _reiniciar_memoria_pico
 from .spimi import MotorIndexadorSPIMI
 
 
@@ -39,10 +40,23 @@ class MetricasIndice:
 
 
 def obtener_memoria_pico_mb() -> float:
-    """Retorna el pico máximo de memoria residente (RSS) en MB en Linux."""
-    rusage = resource.getrusage(resource.RUSAGE_SELF)
-    # En Linux ru_maxrss se expresa en kilobytes
-    return float(rusage.ru_maxrss / 1024.0)
+    """Retorna el pico máximo de memoria residente (RSS) del proceso en MB.
+
+    Se delega en :mod:`indexador.memoria`, que lee ``VmHWM`` de
+    ``/proc/self/status``: a diferencia de ``getrusage``, esa marca sí se puede
+    reiniciar y por lo tanto permite atribuir el pico a cada política por
+    separado.
+    """
+    return memoria_pico_mb()
+
+
+def reiniciar_memoria_pico() -> bool:
+    """Reinicia el pico de RSS del proceso para poder medir una política por separado.
+
+    Se delega en :mod:`indexador.memoria`; ver allí la justificación de por qué
+    hay que reiniciar la marca entre políticas.
+    """
+    return _reiniciar_memoria_pico()
 
 
 def ejecutar_benchmark_politica(
@@ -54,6 +68,8 @@ def ejecutar_benchmark_politica(
     ruta_salida = Path(config.rutas.indice_salida)
     ruta_salida.parent.mkdir(parents=True, exist_ok=True)
 
+    reiniciar_memoria_pico()
+
     inicio_cpu = time.process_time()
     inicio_wall = time.perf_counter()
 
@@ -61,7 +77,11 @@ def ejecutar_benchmark_politica(
         config=config,
         limite_documentos=limite_documentos,
         callback_progreso=(
-            (lambda docs, msg: print(f"  [{config.nombre_politica}] {docs:,} docs - {msg}"))
+            (
+                lambda docs, msg: print(
+                    f"  [{config.nombre_politica}] {docs:,} docs - {msg}"
+                )
+            )
             if callback_progreso
             else None
         ),

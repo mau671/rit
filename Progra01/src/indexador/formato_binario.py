@@ -26,14 +26,65 @@ from typing import Final
 #  - offset_postings: uint64 (8 bytes, Little-Endian)
 #  - reservado/padding: 12 bytes (ceros b"\x00" * 12)
 #
+# Los 12 bytes reservados no desperdician espacio: describen el modelo de
+# ponderación con el que se construyó el índice para que una consulta pueda
+# reproducirlo. El byte 0 identifica el esquema TF, el byte 1 el esquema IDF y el
+# byte 2 lleva banderas de desviación respecto al comportamiento por defecto
+# (normalización coseno y suavizado del IDF activos). Un archivo antiguo, con
+# los doce bytes en cero, se interpreta como la configuración por defecto.
+#
 # Total: 8 + 2 + 2 + 4 + 4 + 8 + 8 + 8 + 8 + 12 = 64 bytes.
 
 MAGIC_BYTES: Final[bytes] = b"ENCUADRE"
 VERSION_FORMATO_ACTUAL: Final[int] = 1
 
+ESQUEMAS_TF_GUARDADOS: Final[tuple[str, ...]] = (
+    "logaritmico",
+    "natural",
+    "binario",
+    "sublineal",
+)
+ESQUEMAS_IDF_GUARDADOS: Final[tuple[str, ...]] = (
+    "estandar",
+    "probabilistico",
+    "ninguno",
+)
+BIT_SIN_COSENO: Final[int] = 1 << 0
+BIT_SIN_SUAVIZADO: Final[int] = 1 << 1
+
+
+def hash_url_a_bytes(valor: str | bytes) -> bytes:
+    """Normaliza un hash de URL a los 32 bytes crudos que exige el formato.
+
+    Acepta el hexadecimal de 64 caracteres que publica la base de la araña, bytes
+    crudos de 32 posiciones o cadenas cortas, y siempre devuelve exactamente 32
+    bytes, rellenando o truncando cuando la entrada no tiene el tamaño esperado.
+    """
+    if isinstance(valor, (bytes, bytearray)):
+        crudo = bytes(valor)
+        if len(crudo) == 32:
+            return crudo
+        if len(crudo) == 64:
+            try:
+                return bytes.fromhex(crudo.decode("ascii"))
+            except (UnicodeDecodeError, ValueError):
+                pass
+        return crudo[:32].ljust(32, b"\x00")
+
+    texto = valor.strip()
+    if len(texto) == 64:
+        try:
+            return bytes.fromhex(texto)
+        except ValueError:
+            pass
+    return texto.encode("utf-8", errors="ignore")[:32].ljust(32, b"\x00")
+
+
 FORMATO_ENCABEZADO: Final[str] = "<8sHHIIQQQQ12s"
 TAMANO_ENCABEZADO: Final[int] = struct.calcsize(FORMATO_ENCABEZADO)
-assert TAMANO_ENCABEZADO == 64, f"El encabezado debe medir 64 bytes exactos, mide {TAMANO_ENCABEZADO}"
+assert TAMANO_ENCABEZADO == 64, (
+    f"El encabezado debe medir 64 bytes exactos, mide {TAMANO_ENCABEZADO}"
+)
 
 
 @dataclass(slots=True)
@@ -50,6 +101,62 @@ class EncabezadoIndice:
     offset_diccionario: int = 0
     offset_postings: int = 0
     reservado: bytes = b"\x00" * 12
+
+    def configurar_modelo(
+        self,
+        esquema_tf: str,
+        esquema_idf: str,
+        normalizacion_coseno: bool = True,
+        suavizado_idf: bool = True,
+    ) -> None:
+        """Guarda el modelo de ponderación en los doce bytes reservados."""
+        if esquema_tf not in ESQUEMAS_TF_GUARDADOS:
+            raise ValueError(f"Esquema TF no almacenable: {esquema_tf!r}")
+        if esquema_idf not in ESQUEMAS_IDF_GUARDADOS:
+            raise ValueError(f"Esquema IDF no almacenable: {esquema_idf!r}")
+
+        banderas = 0
+        if not normalizacion_coseno:
+            banderas |= BIT_SIN_COSENO
+        if not suavizado_idf:
+            banderas |= BIT_SIN_SUAVIZADO
+
+        codigos = bytes(
+            (
+                ESQUEMAS_TF_GUARDADOS.index(esquema_tf),
+                ESQUEMAS_IDF_GUARDADOS.index(esquema_idf),
+                banderas,
+            )
+        )
+        self.reservado = codigos.ljust(12, b"\x00")
+
+    @property
+    def esquema_tf(self) -> str:
+        """Esquema de ponderación por frecuencia de término declarado en el archivo."""
+        codigo = self.reservado[0] if self.reservado else 0
+        if codigo >= len(ESQUEMAS_TF_GUARDADOS):
+            return ESQUEMAS_TF_GUARDADOS[0]
+        return ESQUEMAS_TF_GUARDADOS[codigo]
+
+    @property
+    def esquema_idf(self) -> str:
+        """Esquema de frecuencia inversa de documento declarado en el archivo."""
+        codigo = self.reservado[1] if len(self.reservado) > 1 else 0
+        if codigo >= len(ESQUEMAS_IDF_GUARDADOS):
+            return ESQUEMAS_IDF_GUARDADOS[0]
+        return ESQUEMAS_IDF_GUARDADOS[codigo]
+
+    @property
+    def normalizacion_coseno(self) -> bool:
+        """Indica si los pesos se normalizaron por la norma del documento."""
+        banderas = self.reservado[2] if len(self.reservado) > 2 else 0
+        return not bool(banderas & BIT_SIN_COSENO)
+
+    @property
+    def suavizado_idf(self) -> bool:
+        """Indica si el IDF se calculó con suavizado."""
+        banderas = self.reservado[2] if len(self.reservado) > 2 else 0
+        return not bool(banderas & BIT_SIN_SUAVIZADO)
 
     def empaquetar(self) -> bytes:
         """Serializa el encabezado en exactamente 64 bytes."""
@@ -89,7 +196,9 @@ class EncabezadoIndice:
         ) = struct.unpack(FORMATO_ENCABEZADO, buffer[:TAMANO_ENCABEZADO])
 
         if magic != MAGIC_BYTES:
-            raise ValueError(f"Magic bytes inválidos: {magic!r}, esperado {MAGIC_BYTES!r}")
+            raise ValueError(
+                f"Magic bytes inválidos: {magic!r}, esperado {MAGIC_BYTES!r}"
+            )
 
         return cls(
             magic=magic,
@@ -118,7 +227,9 @@ class EncabezadoIndice:
 
 FORMATO_DOCUMENTO: Final[str] = "<I32sIf"
 TAMANO_DOCUMENTO: Final[int] = struct.calcsize(FORMATO_DOCUMENTO)
-assert TAMANO_DOCUMENTO == 44, f"Cada entrada de documento debe medir 44 bytes, mide {TAMANO_DOCUMENTO}"
+assert TAMANO_DOCUMENTO == 44, (
+    f"Cada entrada de documento debe medir 44 bytes, mide {TAMANO_DOCUMENTO}"
+)
 
 
 @dataclass(slots=True)
@@ -132,18 +243,7 @@ class EntradaDocumento:
 
     def empaquetar(self) -> bytes:
         """Serializa la entrada de documento en exactamente 44 bytes."""
-        hash_bytes = self.hash_url
-        if len(hash_bytes) != 32:
-            # Si viene como hex string de 64 caracteres, convertir a 32 raw bytes
-            if len(hash_bytes) == 64:
-                try:
-                    hash_bytes = bytes.fromhex(hash_bytes.decode("ascii") if isinstance(hash_bytes, (bytes, bytearray)) else hash_bytes)
-                except (ValueError, TypeError):
-                    hash_bytes = hash_bytes[:32].ljust(32, b"\x00")
-            elif len(hash_bytes) < 32:
-                hash_bytes = hash_bytes.ljust(32, b"\x00")
-            else:
-                hash_bytes = hash_bytes[:32]
+        hash_bytes = hash_url_a_bytes(self.hash_url)
 
         return struct.pack(
             FORMATO_DOCUMENTO,
@@ -179,7 +279,7 @@ class EntradaDocumento:
 #  - len_termino: uint16 (2 bytes)
 #  - termino_utf8: bytes UTF-8 (len_termino bytes, visible en hexdump)
 #  - df: uint32 (4 bytes, document frequency)
-#  - idf: float32 (4 bytes, log(N / df))
+#  - idf: float32 (4 bytes, log(N / df) con suavizado, según el esquema del modelo)
 #  - offset_postings: uint64 (8 bytes, offset absoluto del inicio de su lista)
 #  - bytes_postings: uint32 (4 bytes, tamaño en bytes de su bloque de postings)
 #
@@ -206,7 +306,9 @@ class EntradaTermino:
         term_bytes = self.termino.encode("utf-8")
         len_term = len(term_bytes)
         if len_term > 65535:
-            raise ValueError(f"Término demasiado largo ({len_term} bytes): {self.termino[:30]}...")
+            raise ValueError(
+                f"Término demasiado largo ({len_term} bytes): {self.termino[:30]}..."
+            )
 
         # <H {len}s IfQI
         prefijo = struct.pack("<H", len_term)
@@ -220,9 +322,11 @@ class EntradaTermino:
         return prefijo + term_bytes + sufijo
 
     @classmethod
-    def desempaquetar_desde_bytes(cls, buffer: bytes, offset: int = 0) -> tuple[EntradaTermino, int]:
+    def desempaquetar_desde_bytes(
+        cls, buffer: bytes, offset: int = 0
+    ) -> tuple[EntradaTermino, int]:
         """Deserializa un término desde un buffer binario.
-        
+
         Retorna la EntradaTermino y los bytes consumidos.
         """
         if len(buffer) - offset < 2:
@@ -241,7 +345,9 @@ class EntradaTermino:
         termino = term_bytes.decode("utf-8", errors="replace")
         pos += len_term
 
-        df, idf, offset_post, bytes_post = struct.unpack_from(FORMATO_TERMINO_SUFIJO, buffer, pos)
+        df, idf, offset_post, bytes_post = struct.unpack_from(
+            FORMATO_TERMINO_SUFIJO, buffer, pos
+        )
         return (
             cls(
                 termino=termino,

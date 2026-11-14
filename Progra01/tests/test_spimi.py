@@ -58,3 +58,45 @@ def test_spimi_indexar_pequeno(tmp_path: Path) -> None:
         doc0 = lector.leer_documento(0)
         assert doc0 is not None
         assert doc0.norma_vectorial > 0.0
+
+
+def test_limite_de_memoria_corta_bloques_por_consumo(tmp_path: Path) -> None:
+    """El límite de memoria debe forzar volcados sin depender del conteo de documentos."""
+    from indexador.memoria import memoria_residente_mb
+
+    dir_tmp = tmp_path / "spimi_memoria"
+    # Un límite irrealmente bajo garantiza que el motor corte antes del tope de docs.
+    motor = MotorIndexadorSPIMI(
+        directorio_temporal=dir_tmp,
+        tamano_bloque_documentos=1_000_000,
+        limite_memoria_mb=1,
+    )
+    assert memoria_residente_mb() > 1
+
+    volcados: list[str] = []
+
+    def progreso(_docs: int, mensaje: str) -> None:
+        if "Bloque" in mensaje:
+            volcados.append(mensaje)
+
+    docs = [(i, f"{i:064x}", ["cine", "guion", f"doc{i}"]) for i in range(600)]
+    motor.indexar_coleccion(
+        iterador_documentos=iter(docs),
+        ruta_salida_indice=tmp_path / "memoria.idx",
+        callback_progreso=progreso,
+    )
+
+    # Con el tope de documentos elevado, solo el límite de memoria puede crear bloques.
+    assert volcados, "no se volcó ningún bloque pese a superar el límite de memoria"
+
+
+def test_indice_vacio_se_escribe_completo(tmp_path: Path) -> None:
+    motor = MotorIndexadorSPIMI(directorio_temporal=tmp_path / "vacio")
+    ruta = tmp_path / "vacio.idx"
+    stats = motor.indexar_coleccion(iterador_documentos=iter(()), ruta_salida_indice=ruta)
+
+    assert stats["total_docs"] == 0
+    assert stats["tamano_bytes"] == 64
+    with LectorIndiceBinario(ruta) as lector:
+        assert lector.encabezado.total_docs == 0
+        assert lector.verificar_estructura() == []

@@ -26,7 +26,7 @@ from .formato_binario import (
 
 class EscritorIndiceBinario:
     """Escritor a disco del archivo binario .idx con manejo eficiente de buffers.
-    
+
     Flujo de escritura en archivo:
     1. `inicializar()`: Escribe un encabezado placeholder de 64 bytes.
     2. `escribir_documentos(documentos)`: Escribe secuencialmente la tabla de docs y normas.
@@ -50,6 +50,10 @@ class EscritorIndiceBinario:
         self.offset_docs: int = TAMANO_ENCABEZADO
         self.offset_diccionario: int = 0
         self.offset_postings: int = 0
+
+        # Modelo de ponderación a declarar en el encabezado:
+        # (esquema_tf, esquema_idf, normalizacion_coseno, suavizado_idf)
+        self.modelo: tuple[str, str, bool, bool] | None = None
 
     def __enter__(self) -> Self:
         self.abrir()
@@ -75,7 +79,7 @@ class EscritorIndiceBinario:
 
     def escribir_documentos(self, documentos: Iterable[EntradaDocumento]) -> int:
         """Escribe la tabla contigua de documentos y normas vectoriales.
-        
+
         Retorna la cantidad de documentos escritos.
         """
         if not self._archivo:
@@ -108,7 +112,7 @@ class EscritorIndiceBinario:
         terminos_con_postings: Iterable[tuple[str, int, float, Sequence[Posting]]],
     ) -> tuple[int, int]:
         """Escribe las secciones de Diccionario y Postings.
-        
+
         Para mantener el diseño donde el diccionario apunta al offset_postings de cada término:
         Estrategia eficiente:
         1. Escribimos la sección de postings primero o segundo.
@@ -117,26 +121,26 @@ class EscritorIndiceBinario:
            - Documentos: [offset_docs .. offset_diccionario - 1]
            - Diccionario: [offset_diccionario .. offset_postings - 1]
            - Postings:    [offset_postings .. fin]
-        
+
         Para escribir el diccionario antes que los postings conociendo los offsets exactos de postings:
         ¡El tamaño en bytes de los postings de cada término se conoce de antemano!
         Cada posting mide exactamente 12 bytes (`TAMANO_POSTING`).
-        
+
         Por lo tanto:
         `bytes_postings = len(postings) * 12`.
-        
+
         Podemos:
         1) Calcular primero la sección de diccionario en memoria/buffer o pre-calcular offsets, O
         2) Escribir el diccionario a un buffer en memoria mientras calculamos los offsets acumulados
            de postings (partiendo de un offset estimado), o escribir los postings primero a un archivo
            temporal o directo al archivo y guardar el offset_postings.
-        
+
         Dado que el encabezado tiene `offset_diccionario` y `offset_postings`:
         No hay restricción de que el diccionario deba estar antes físicamente que los postings o viceversa,
         pero siguiendo la convención de la especificación:
         Sección 3: Diccionario
         Sección 4: Postings
-        
+
         Podemos calcular el tamaño total del diccionario pasando una vez, o escribir el diccionario
         después de calcular o usando un buffer. Como los términos caben en memoria o se pueden
         procesar de forma streaming:
@@ -144,7 +148,7 @@ class EscritorIndiceBinario:
         postings en sección 3 y diccionario en sección 4. Pero queremos que la sección 3 sea
         Diccionario y sección 4 Postings para que en `hexdump -C` aparezca:
         [Encabezado] -> [Documentos] -> [Diccionario legible en ASCII] -> [Postings binarios].
-        
+
         Para que el Diccionario legible esté antes de los Postings:
         Calculamos la longitud del bloque del diccionario:
         Si `terminos_con_postings` se pasa como un generador o lista:
@@ -153,7 +157,7 @@ class EscritorIndiceBinario:
         Con esto, conocemos exactamente `offset_diccionario` y `offset_postings`:
           `offset_diccionario = offset_actual`
           `offset_postings = offset_diccionario + tamano_total_diccionario`
-        
+
         ¡Y podemos escribir el diccionario en streaming y luego los postings en streaming!
         """
         if not self._archivo:
@@ -162,6 +166,18 @@ class EscritorIndiceBinario:
         # Convertir a lista si es necesario o manejar colección
         terminos_lista = list(terminos_con_postings)
         terminos_lista.sort(key=lambda t: t[0])  # Orden lexicográfico obligatorio
+
+        repetidos = [
+            actual
+            for previo, actual in zip(
+                (t[0] for t in terminos_lista), (t[0] for t in terminos_lista[1:])
+            )
+            if previo == actual
+        ]
+        if repetidos:
+            raise ValueError(
+                f"El diccionario recibió términos duplicados: {repetidos[:5]}"
+            )
 
         self.offset_diccionario = self._archivo.tell()
 
@@ -230,7 +246,8 @@ class EscritorIndiceBinario:
 
     def escribir_diccionario_y_anexar_postings_streaming(
         self,
-        terminos_meta: Sequence[tuple[str, int, float, int]],  # (termino, df, idf, cant_postings)
+        # (termino, df, idf, cantidad de postings)
+        terminos_meta: Sequence[tuple[str, int, float, int]],
         ruta_archivo_postings_tmp: Path | str,
     ) -> tuple[int, int]:
         """Escribe la sección de Diccionario y transfiere el archivo de postings en streaming.
@@ -310,8 +327,9 @@ class EscritorIndiceBinario:
             offset_docs=self.offset_docs,
             offset_diccionario=self.offset_diccionario,
             offset_postings=self.offset_postings,
-            reservado=b"\x00" * 12,
         )
+        if self.modelo is not None:
+            encabezado_final.configurar_modelo(*self.modelo)
 
         self._archivo.seek(0, io.SEEK_SET)
         self._archivo.write(encabezado_final.empaquetar())

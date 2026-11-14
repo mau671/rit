@@ -31,14 +31,16 @@ class FlagsNormalizacion(IntFlag):
     """Banderas binarias (uint16) de normalización para el encabezado .idx."""
 
     NINGUNA = 0
-    MINUSCULAS = 1 << 0       # 0x0001: Conversión a minúsculas
+    MINUSCULAS = 1 << 0  # 0x0001: Conversión a minúsculas
     ELIMINAR_PUNTUACION = 1 << 1  # 0x0002: Eliminación de signos de puntuación
-    STOPWORDS = 1 << 2        # 0x0004: Filtrado de palabras vacías
-    STEMMING = 1 << 3         # 0x0008: Reducción morfológica (Snowball)
+    STOPWORDS = 1 << 2  # 0x0004: Filtrado de palabras vacías
+    STEMMING = 1 << 3  # 0x0008: Reducción morfológica (Snowball)
     NORMALIZAR_NUMEROS = 1 << 4  # 0x0010: Tratamiento semántico de números
-    NORMALIZAR_FECHAS = 1 << 5   # 0x0020: Normalización de fechas/años
-    EXPANDIR_SINONIMOS = 1 << 6  # 0x0040: Normalización/expansión con tesauro audiovisual
-    REMOVER_ACENTOS = 1 << 7     # 0x0080: Eliminación de tildes/diacríticos
+    NORMALIZAR_FECHAS = 1 << 5  # 0x0020: Normalización de fechas/años
+    EXPANDIR_SINONIMOS = (
+        1 << 6
+    )  # 0x0040: Normalización/expansión con tesauro audiovisual
+    REMOVER_ACENTOS = 1 << 7  # 0x0080: Eliminación de tildes/diacríticos
 
 
 def parsear_booleano(valor: str | bool | int) -> bool:
@@ -94,7 +96,7 @@ def parsear_valor_primitivo(valor_raw: str) -> Any:
 
 class ParserConfiguracionLinux:
     """Analizador para archivos de configuración estilo Linux (.conf).
-    
+
     Características:
     - Comentarios iniciados con '#' o ';' en líneas completas o inline.
     - Secciones delimitadas por [seccion].
@@ -240,15 +242,45 @@ class ConfiguracionNormalizacion:
             flags |= FlagsNormalizacion.REMOVER_ACENTOS
         return int(flags)
 
+    @classmethod
+    def desde_flags(cls, flags: int) -> ConfiguracionNormalizacion:
+        """Reconstruye la normalización a partir de la máscara del encabezado.
+
+        Permite que una consulta use exactamente los mismos filtros con los que se
+        construyó el índice. Los parámetros que la máscara no codifica (idioma,
+        idiomas de las palabras vacías, longitudes de token y modo numérico) toman
+        sus valores por defecto, que son los de las tres políticas del proyecto.
+        """
+        f = FlagsNormalizacion(flags & 0xFFFF)
+        return cls(
+            minusculas=bool(f & FlagsNormalizacion.MINUSCULAS),
+            eliminar_puntuacion=bool(f & FlagsNormalizacion.ELIMINAR_PUNTUACION),
+            remover_acentos=bool(f & FlagsNormalizacion.REMOVER_ACENTOS),
+            stopwords=bool(f & FlagsNormalizacion.STOPWORDS),
+            stemming=bool(f & FlagsNormalizacion.STEMMING),
+            normalizar_numeros=bool(f & FlagsNormalizacion.NORMALIZAR_NUMEROS),
+            modo_numeros="token"
+            if f & FlagsNormalizacion.NORMALIZAR_NUMEROS
+            else "preservar",
+            normalizar_fechas=bool(f & FlagsNormalizacion.NORMALIZAR_FECHAS),
+            expandir_sinonimos=bool(f & FlagsNormalizacion.EXPANDIR_SINONIMOS),
+        )
+
 
 @dataclass(slots=True)
 class ConfiguracionModelo:
     """Configuración del modelo de recuperación y ponderación TF/IDF."""
 
-    esquema_tf: str = "logaritmico"  # 'natural' (raw tf), 'logaritmico' (1 + log(tf)), 'binario', 'sublineal'
-    esquema_idf: str = "estandar"    # 'estandar' (log(N/df)), 'probabilistico' (max(0, log((N-df)/df))), 'ninguno'
+    esquema_tf: str = "logaritmico"  # 'natural' (tf crudo), 'logaritmico' (1 + ln tf), 'binario', 'sublineal'
+    esquema_idf: str = "estandar"  # 'estandar' (ln((N/df) + 1) con suavizado), 'probabilistico' (ln((N-df)/df)), 'ninguno'
     normalizacion_coseno: bool = True
     suavizado_idf: bool = True
+
+    def validar(self) -> None:
+        """Verifica que los esquemas correspondan a fórmulas implementadas."""
+        from .modelo import validar_modelo
+
+        validar_modelo(self.esquema_tf, self.esquema_idf)
 
 
 @dataclass(slots=True)
@@ -267,7 +299,9 @@ class ConfiguracionIndexador:
     nombre_politica: str = "estandar"
     descripcion: str = "Política estándar con stopwords y stemming multilingüe"
     rutas: ConfiguracionRutas = field(default_factory=ConfiguracionRutas)
-    normalizacion: ConfiguracionNormalizacion = field(default_factory=ConfiguracionNormalizacion)
+    normalizacion: ConfiguracionNormalizacion = field(
+        default_factory=ConfiguracionNormalizacion
+    )
     modelo: ConfiguracionModelo = field(default_factory=ConfiguracionModelo)
     spimi: ConfiguracionSpimi = field(default_factory=ConfiguracionSpimi)
 
@@ -334,7 +368,9 @@ class ConfiguracionIndexador:
                 ),
             )
 
-        raise ValueError(f"Política desconocida: {politica!r}. Opciones: 'minimo', 'estandar', 'avanzado'")
+        raise ValueError(
+            f"Política desconocida: {politica!r}. Opciones: 'minimo', 'estandar', 'avanzado'"
+        )
 
     @classmethod
     def cargar_desde_archivo(cls, ruta: str | Path) -> ConfiguracionIndexador:
@@ -359,7 +395,9 @@ class ConfiguracionIndexador:
             cfg.nombre_politica = str(sec_global["nombre_politica"])
         if "descripcion" in sec_global:
             v_desc = sec_global["descripcion"]
-            cfg.descripcion = ", ".join(v_desc) if isinstance(v_desc, list) else str(v_desc)
+            cfg.descripcion = (
+                ", ".join(v_desc) if isinstance(v_desc, list) else str(v_desc)
+            )
 
         # Sección [rutas]
         sec_rutas = d.get("rutas", {})
@@ -405,6 +443,7 @@ class ConfiguracionIndexador:
             if hasattr(cfg.spimi, campo):
                 setattr(cfg.spimi, campo, int(val))
 
+        cfg.modelo.validar()
         return cfg
 
     def a_texto_conf(self) -> str:

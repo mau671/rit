@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -20,9 +19,9 @@ from .benchmark import (
     ejecutar_benchmark_politica,
     generar_tabla_comparativa_texto,
 )
+from .buscador import BuscadorVectorial
 from .configuracion import ConfiguracionIndexador
 from .lector_binario import LectorIndiceBinario
-from .normalizador import Normalizador
 from .spimi import MotorIndexadorSPIMI
 
 
@@ -73,14 +72,46 @@ def comando_inspeccionar(args: argparse.Namespace) -> int:
         print(f"Error: Archivo no encontrado: {ruta_idx}", file=sys.stderr)
         return 1
 
-    informe = LectorIndiceBinario.inspeccionar(ruta_idx, num_muestras=args.muestras)
-    print(informe)
+    print(LectorIndiceBinario.inspeccionar(ruta_idx, num_muestras=args.muestras))
 
-    if args.termino:
-        with LectorIndiceBinario(ruta_idx) as lector:
+    with LectorIndiceBinario(ruta_idx) as lector:
+        normalizacion = lector.normalizacion
+        activos = [
+            nombre
+            for nombre, activo in (
+                ("minúsculas", normalizacion.minusculas),
+                ("eliminar puntuación", normalizacion.eliminar_puntuacion),
+                ("remover acentos", normalizacion.remover_acentos),
+                ("stopwords", normalizacion.stopwords),
+                ("stemming", normalizacion.stemming),
+                ("números", normalizacion.normalizar_numeros),
+                ("fechas", normalizacion.normalizar_fechas),
+                ("sinónimos", normalizacion.expandir_sinonimos),
+            )
+            if activo
+        ]
+        print("\nNORMALIZACIÓN DECLARADA EN EL ENCABEZADO:")
+        print(
+            f"  - Flags 0x{lector.encabezado.flags_normalizacion:04X}: "
+            f"{', '.join(activos) or 'ninguna'}"
+        )
+
+        if args.verificar:
+            problemas = lector.verificar_estructura()
+            if problemas:
+                print("\nVERIFICACIÓN DE INTEGRIDAD: FALLÓ")
+                for problema in problemas:
+                    print(f"  - {problema}")
+                return 1
+            print("\nVERIFICACIÓN DE INTEGRIDAD: OK (offsets, vocabulario y postings consistentes)")
+
+        if args.termino:
             termino = lector.buscar_termino(args.termino)
             if not termino:
                 print(f"\n[!] El término '{args.termino}' NO se encuentra en el vocabulario.")
+                parecidos = lector.terminos_con_prefijo(args.termino[:4])
+                if parecidos:
+                    print("    Términos parecidos: " + ", ".join(t.termino for t in parecidos))
             else:
                 print(f"\n[Término: '{termino.termino}']")
                 print(f"  - DF: {termino.df:,} documentos")
@@ -90,8 +121,11 @@ def comando_inspeccionar(args: argparse.Namespace) -> int:
 
                 postings = lector.leer_postings(termino)
                 print(f"  - Muestra de primeros {min(len(postings), 10)} postings:")
-                for p in postings[:10]:
-                    print(f"      doc_id={p.doc_id:<6} tf={p.tf:<4} peso_tfidf={p.peso_tfidf:.4f}")
+                for posting in postings[:10]:
+                    print(
+                        f"      doc_id={posting.doc_id:<6} tf={posting.tf:<4} "
+                        f"peso_tfidf={posting.peso_tfidf:.4f}"
+                    )
     return 0
 
 
@@ -102,65 +136,36 @@ def comando_buscar(args: argparse.Namespace) -> int:
         print(f"Error: Archivo de índice no encontrado: {ruta_idx}", file=sys.stderr)
         return 1
 
-    with LectorIndiceBinario(ruta_idx) as lector:
-        enc = lector.encabezado
-        print(f"==> Índice: {ruta_idx.name} (Docs: {enc.total_docs:,}, Vocabulario: {enc.total_terminos:,})")
+    with BuscadorVectorial.desde_archivo(ruta_idx) as buscador:
+        encabezado = buscador.lector.encabezado
+        print(
+            f"==> Índice: {ruta_idx.name} "
+            f"(Docs: {encabezado.total_docs:,}, Vocabulario: {encabezado.total_terminos:,})"
+        )
+        respuesta = buscador.buscar(args.consulta, top=args.top)
+        print(f"==> Consulta: '{respuesta.consulta}' -> Tokens: {respuesta.tokens}")
 
-        # Normalizar consulta con la misma configuración del índice
-        # Reconstruir normalizador a partir de los flags del encabezado
-        normalizador = Normalizador()
-        tokens_consulta = normalizador.normalizar_texto(args.consulta)
-        print(f"==> Consulta: '{args.consulta}' -> Tokens: {tokens_consulta}")
-
-        if not tokens_consulta:
+        if not respuesta.tokens:
             print("No se extrajeron términos válidos de la consulta.")
             return 0
 
-        # Ponderación de la consulta
-        conteo_q: dict[str, int] = {}
-        for t in tokens_consulta:
-            conteo_q[t] = conteo_q.get(t, 0) + 1
+        if respuesta.terminos_ausentes:
+            print(f"==> Términos ausentes del vocabulario: {respuesta.terminos_ausentes}")
 
-        pesos_q: dict[str, float] = {}
-        acum_q_norm = 0.0
-
-        terminos_validos = []
-        for t, tf_q in conteo_q.items():
-            entrada_t = lector.buscar_termino(t)
-            if entrada_t:
-                peso = (1.0 + math.log(tf_q)) * entrada_t.idf
-                pesos_q[t] = peso
-                acum_q_norm += peso * peso
-                terminos_validos.append(entrada_t)
-
-        if not terminos_validos:
+        if not respuesta.resultados:
             print("Ninguno de los términos de la consulta se encuentra en el índice.")
+            if respuesta.sugerencias:
+                print(f"Sugerencias del vocabulario: {', '.join(respuesta.sugerencias)}")
             return 0
 
-        norma_q = math.sqrt(acum_q_norm)
-        scores_docs: dict[int, float] = {}
-
-        for entrada_t in terminos_validos:
-            peso_t_q = pesos_q[entrada_t.termino]
-            postings = lector.leer_postings(entrada_t)
-            for p in postings:
-                scores_docs[p.doc_id] = scores_docs.get(p.doc_id, 0.0) + (p.peso_tfidf * peso_t_q)
-
-        # Normalizar por norma del documento y de la consulta
-        top_k = []
-        for doc_id, dot_prod in scores_docs.items():
-            doc_meta = lector.leer_documento(doc_id)
-            norma_d = doc_meta.norma_vectorial if doc_meta.norma_vectorial > 0 else 1.0
-            similitud = dot_prod / (norma_q * norma_d)
-            top_k.append((doc_id, similitud, doc_meta.hash_url.hex()))
-
-        top_k.sort(key=lambda x: x[1], reverse=True)
-
-        print(f"\nResultados más relevantes (Top {min(args.top, len(top_k))}):")
-        print(f"{'Doc ID':<8} | {'Similitud':>10} | {'Hash URL (SHA-256)':<64}")
-        print("-" * 88)
-        for d_id, sim, hash_hex in top_k[: args.top]:
-            print(f"{d_id:<8} | {sim:>10.4f} | {hash_hex}")
+        print(f"\nResultados más relevantes (Top {len(respuesta.resultados)}):")
+        print(f"{'Doc ID':<8} | {'Similitud':>10} | {'Tokens':>8} | {'Hash URL (SHA-256)':<64}")
+        print("-" * 98)
+        for resultado in respuesta.resultados:
+            print(
+                f"{resultado.doc_id:<8} | {resultado.similitud:>10.4f} | "
+                f"{resultado.num_tokens:>8,} | {resultado.hash_url:<64}"
+            )
     return 0
 
 
@@ -175,7 +180,7 @@ def comando_benchmark(args: argparse.Namespace) -> int:
 
     metricas_todas = []
     print("================================================================================")
-    print(" INICIANDO BENCHMARK DE LAS 3 POLÍTICAS DE INDEXACIÓN (PERSONA A)")
+    print(" INICIANDO BENCHMARK DE LAS 3 POLÍTICAS DE INDEXACIÓN")
     print("================================================================================")
 
     for ruta in rutas_confs:
@@ -224,6 +229,11 @@ def main() -> None:
     p_insp.add_argument("archivo", help="Ruta al archivo binario .idx")
     p_insp.add_argument("-t", "--termino", default=None, help="Buscar término específico en el vocabulario")
     p_insp.add_argument("-m", "--muestras", type=int, default=5, help="Número de muestras a listar")
+    p_insp.add_argument(
+        "--verificar",
+        action="store_true",
+        help="Comprobar offsets, orden del vocabulario y bloques de postings",
+    )
     p_insp.set_defaults(func=comando_inspeccionar)
 
     # Subcomando: buscar

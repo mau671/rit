@@ -22,8 +22,10 @@ from typing import BinaryIO
 
 from .configuracion import ConfiguracionIndexador
 from .escritor_binario import EscritorIndiceBinario
-from .formato_binario import EntradaDocumento
+from .formato_binario import EntradaDocumento, hash_url_a_bytes
 from .lector_coleccion import LectorColeccion
+from .memoria import memoria_residente_mb
+from .modelo import calcular_idf, calcular_peso_tf, validar_modelo
 from .normalizador import Normalizador
 
 
@@ -97,36 +99,55 @@ class MotorIndexadorSPIMI:
         self,
         directorio_temporal: Path | str | None = None,
         tamano_bloque_documentos: int = 25000,
+        limite_memoria_mb: int = 0,
         esquema_tf: str = "logaritmico",
         esquema_idf: str = "estandar",
+        suavizado_idf: bool = True,
+        normalizacion_coseno: bool = True,
+        tamano_buffer_kb: int = 64,
     ) -> None:
         self.directorio_temporal = (
-            Path(directorio_temporal) if directorio_temporal else Path(tempfile.gettempdir()) / "spimi_encuadre"
+            Path(directorio_temporal)
+            if directorio_temporal
+            else Path(tempfile.gettempdir()) / "spimi_encuadre"
         )
         self.tamano_bloque_documentos = tamano_bloque_documentos
+        self.limite_memoria_mb = limite_memoria_mb
         self.esquema_tf = esquema_tf
         self.esquema_idf = esquema_idf
+        self.suavizado_idf = suavizado_idf
+        self.tamano_buffer_kb = tamano_buffer_kb
+        self.normalizacion_coseno = normalizacion_coseno
+
+        validar_modelo(esquema_tf, esquema_idf)
 
     def _calcular_peso_tf(self, tf: int) -> float:
         """Calcula el peso TF del término según el esquema configurado."""
-        if tf <= 0:
-            return 0.0
-        if self.esquema_tf in {"logaritmico", "sublineal"}:
-            return 1.0 + math.log(tf)
-        if self.esquema_tf == "binario":
-            return 1.0
-        return float(tf)
+        return calcular_peso_tf(tf, self.esquema_tf)
 
     def _calcular_idf(self, n_docs: int, df: int) -> float:
         """Calcula el valor IDF del término según el esquema configurado."""
-        if df <= 0 or n_docs <= 0:
-            return 0.0
-        if self.esquema_idf == "estandar":
-            return float(math.log((n_docs / df) + 1.0))
-        if self.esquema_idf == "probabilistico":
-            ratio = (n_docs - df) / df
-            return float(max(0.0, math.log(ratio + 1.0)))
-        return 1.0
+        return calcular_idf(n_docs, df, self.esquema_idf, self.suavizado_idf)
+
+    def _memoria_excedida(self, docs_en_bloque: int) -> bool:
+        """Indica si el proceso superó el límite de memoria configurado.
+
+        El límite se mide sobre la memoria residente y no sobre el número de
+        documentos porque el tamaño de un documento varía en dos órdenes de
+        magnitud dentro del corpus audiovisual: un guion completo pesa cientos de
+        kilobytes y una ficha técnica unos pocos. Contar documentos, como hacía
+        la versión anterior, volcaba bloques demasiado grandes o demasiado
+        pequeños según lo que tocara en cada tramo de la colección.
+
+        La consulta a ``/proc`` se hace cada 200 documentos para no pagar una
+        lectura del sistema de archivos por documento en colecciones de cientos
+        de miles de archivos.
+        """
+        if self.limite_memoria_mb <= 0:
+            return False
+        if docs_en_bloque % 200 != 0:
+            return False
+        return memoria_residente_mb() >= self.limite_memoria_mb
 
     def _escribir_bloque_spimi(
         self,
@@ -191,9 +212,11 @@ class MotorIndexadorSPIMI:
             docs_en_bloque += 1
 
             try:
-                hash_bytes = bytes.fromhex(hash_url_str) if len(hash_url_str) == 64 else hash_url_str.encode("ascii")[:32]
-            except ValueError:
-                hash_bytes = hash_url_str.encode("ascii", errors="ignore")[:32].ljust(32, b"\x00")
+                hash_bytes = hash_url_a_bytes(hash_url_str)
+            except (ValueError, UnicodeEncodeError):
+                hash_bytes = hash_url_str.encode("ascii", errors="ignore")[:32].ljust(
+                    32, b"\x00"
+                )
 
             documentos_metadatos.append(
                 MetadatoDocTemporal(
@@ -210,14 +233,19 @@ class MotorIndexadorSPIMI:
             for term, tf in conteo_terminos.items():
                 indice_memoria[term].append((doc_id, tf))
 
-            if docs_en_bloque >= self.tamano_bloque_documentos:
+            if (
+                docs_en_bloque >= self.tamano_bloque_documentos
+                or self._memoria_excedida(docs_en_bloque)
+            ):
                 ruta_b = self._escribir_bloque_spimi(indice_memoria, num_bloque)
                 bloques_temporales.append(ruta_b)
                 num_bloque += 1
                 indice_memoria.clear()
                 docs_en_bloque = 0
                 if callback_progreso:
-                    callback_progreso(total_docs, f"Bloque {num_bloque} volcado a disco")
+                    callback_progreso(
+                        total_docs, f"Bloque {num_bloque} volcado a disco"
+                    )
 
         # Volcar remanente si existe
         if indice_memoria:
@@ -236,10 +264,26 @@ class MotorIndexadorSPIMI:
         # Fase 2: K-Way Merge con streaming de postings a disco
         N = total_docs
         if N == 0:
-            with EscritorIndiceBinario(ruta_salida) as escritor:
+            with EscritorIndiceBinario(
+                ruta_salida, tamano_buffer_kb=self.tamano_buffer_kb
+            ) as escritor:
                 escritor.flags_normalizacion = flags_normalizacion
+                escritor.modelo = (
+                    self.esquema_tf,
+                    self.esquema_idf,
+                    self.normalizacion_coseno,
+                    self.suavizado_idf,
+                )
+                escritor.escribir_documentos([])
+                escritor.escribir_diccionario_y_postings([])
                 escritor.finalizar()
-            return {"total_docs": 0, "total_terminos": 0, "total_postings": 0, "tiempo_segundos": 0.0}
+            return {
+                "total_docs": 0,
+                "total_terminos": 0,
+                "total_postings": 0,
+                "tiempo_segundos": 0.0,
+                "tamano_bytes": ruta_salida.stat().st_size,
+            }
 
         normas_cuadradas = array("f", [0.0] * N)
 
@@ -263,7 +307,9 @@ class MotorIndexadorSPIMI:
             buffer_post = bytearray()
             tamano_buffer_post = 128 * 1024
 
-            def procesar_termino_acumulado(term: str, pares_doc_tf: list[tuple[int, int]]) -> None:
+            def procesar_termino_acumulado(
+                term: str, pares_doc_tf: list[tuple[int, int]]
+            ) -> None:
                 nonlocal total_postings_global
                 df = len(pares_doc_tf)
                 if df == 0:
@@ -334,8 +380,16 @@ class MotorIndexadorSPIMI:
             )
 
         # Fase 3: Escribir archivo binario final .idx
-        with EscritorIndiceBinario(ruta_salida) as escritor:
+        with EscritorIndiceBinario(
+            ruta_salida, tamano_buffer_kb=self.tamano_buffer_kb
+        ) as escritor:
             escritor.flags_normalizacion = flags_normalizacion
+            escritor.modelo = (
+                self.esquema_tf,
+                self.esquema_idf,
+                self.normalizacion_coseno,
+                self.suavizado_idf,
+            )
             escritor.escribir_documentos(entradas_documentos)
             escritor.escribir_diccionario_y_anexar_postings_streaming(
                 terminos_meta,
@@ -377,8 +431,12 @@ class MotorIndexadorSPIMI:
         motor = cls(
             directorio_temporal=config.rutas.directorio_spimi,
             tamano_bloque_documentos=config.spimi.docs_por_bloque,
+            limite_memoria_mb=config.spimi.limite_memoria_mb,
             esquema_tf=config.modelo.esquema_tf,
             esquema_idf=config.modelo.esquema_idf,
+            suavizado_idf=config.modelo.suavizado_idf,
+            normalizacion_coseno=config.modelo.normalizacion_coseno,
+            tamano_buffer_kb=config.spimi.tamano_buffer_escritura_kb,
         )
 
         flags = config.normalizacion.calcular_flags_bitmask()
