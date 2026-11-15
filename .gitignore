@@ -38,9 +38,6 @@ Instrucciones.md
 *Instrucciones*.pdf
 Proyecto*.pdf
 
-# Fuentes LaTeX de los informes
-*.tex
-
 # Skills de agentes instaladas localmente (no se versionan)
 .agents/
 skills-lock.json
