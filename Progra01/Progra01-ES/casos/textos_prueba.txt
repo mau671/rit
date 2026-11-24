@@ -1,0 +1,22 @@
+# Textos de prueba para comparar la normalización del propio y de Elasticsearch.
+# Cada caso se separa con una línea que contiene solo tres guiones.
+# Las líneas que empiezan con # se ignoran.
+José vio “El Padrino” (1972) el 15/03/2024 — un sci-fi de O’Brien con 9.5 puntos.
+---
+Los Directores corrían a ver las Películas de Kurosawa en el año 1954.
+---
+The director and the screenwriter wrote the screenplay for the movie in 1999; the producers loved it.
+---
+La niña soñaba con el año 2001: una odisea del espacio, estrenada el 1968-04-02 en cines.
+---
+INT. SPACESHIP – NIGHT. Dave looks at HAL 9000. "Open the pod bay doors," he says. It's 3,5 meters away.
+---
+El documental y la animación ganaron premios; el cineasta agradeció al reparto y al elenco.
+---
+A documentary about filmmakers, starring famous actors, with a great soundtrack and cinematography.
+---
+Ligaduras ﬁlm y ﬂores, números de ancho completo １２３ y comillas «raras» ‘simples’.
+---
+Spider-Man y post-credits: motion-picture, motion_picture, banda_sonora y la película de 1888.
+---
+a e i o u y de la el x

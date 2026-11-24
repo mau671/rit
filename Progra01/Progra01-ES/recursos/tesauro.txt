@@ -1,0 +1,19 @@
+# Tesauro audiovisual en formato Solr/Lucene (reemplazo: variantes => canónico)
+# Copiado de TESAURO_AUDIOVISUAL en normalizador.py del indexador propio.
+# Se omiten las entradas con espacios (motion picture, short film) porque el propio nunca las aplica:
+# su tokenizador produce palabras sueltas.
+pelicula, peliculas, película, películas, movie, movies, cinema, cinematografo, cinematógrafo, cinematografia, cinematografía, cinematografico, cinematográfico, motion_picture, motion-picture, cine, filme, filmes, feature => film
+director, directores, directora, directoras, directing, filmmaker, filmmakers, cineasta, cineastas => realizador
+guion, guiones, guión, guiónes, script, scripts, screenwriting, libreto, libretos => screenplay
+guionista, guionistas, scriptwriter, screenwriter, screenwriters, libretista => screenwriter
+actor, actores, actriz, actrices, actuacion, actuación, interprete, intérprete, interpretes, intérpretes, protagonista, protagonistas, star, stars, starring => interprete
+reparto, elenco, cast, casting => cast
+productor, productores, productora, productoras, produccion, producción, producer, producers, producing => producer
+largometraje, largometrajes => largometraje
+cortometraje, cortometrajes, short, shorts => cortometraje
+documental, documentales, documentary, documentaries => documental
+animacion, animación, animation, animated => animacion
+thriller, suspense, suspenso => suspenso
+soundtrack, soundtracks, ost, score, musica, música, compositor, composer => banda_sonora
+fotografia, fotografía, cinematography, cameraman => fotografia
+montaje, edicion, edición, editing, editor => edicion

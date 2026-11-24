@@ -1,0 +1,137 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "codec": "default",
+    "refresh_interval": "-1",
+    "analyze.max_token_count": 1000000,
+    "similarity": {
+      "tfidf_propio": {
+        "type": "scripted",
+        "weight_script": {
+          "source": "double idf = (((double) term.docFreq) > 0 ? Math.log(((double) field.docCount) / ((double) term.docFreq) + 1.0) : 0.0); return query.boost * idf;"
+        },
+        "script": {
+          "source": "double idf = (((double) term.docFreq) > 0 ? Math.log(((double) field.docCount) / ((double) term.docFreq) + 1.0) : 0.0); return weight * (doc.freq > 0 ? 1.0 + Math.log(doc.freq) : 0.0) * idf;"
+        }
+      }
+    },
+    "analysis": {
+      "char_filter": {
+        "nfkc": {
+          "type": "icu_normalizer",
+          "name": "nfkc",
+          "mode": "compose"
+        },
+        "tipografia": {
+          "type": "mapping",
+          "mappings": [
+            "’ => \\u0027",
+            "‘ => \\u0027",
+            "` => \\u0027",
+            "“ => \\u0022",
+            "” => \\u0022",
+            "« => \\u0022",
+            "» => \\u0022",
+            "— => \\u0020-\\u0020",
+            "– => \\u0020-\\u0020"
+          ]
+        }
+      },
+      "tokenizer": {
+        "tokens_propio": {
+          "type": "pattern",
+          "pattern": "<[A-Z0-9_]+>|[^\\W_]+(?:[-'_][^\\W_]+)*",
+          "group": 0,
+          "flags": "UNICODE_CHARACTER_CLASS"
+        }
+      },
+      "filter": {
+        "longitud": {
+          "type": "length",
+          "min": 2,
+          "max": 50
+        }
+      },
+      "analyzer": {
+        "politica_es": {
+          "type": "custom",
+          "char_filter": [
+            "nfkc",
+            "tipografia"
+          ],
+          "tokenizer": "tokens_propio",
+          "filter": [
+            "lowercase",
+            "longitud"
+          ]
+        },
+        "politica_en": {
+          "type": "custom",
+          "char_filter": [
+            "nfkc",
+            "tipografia"
+          ],
+          "tokenizer": "tokens_propio",
+          "filter": [
+            "lowercase",
+            "longitud"
+          ]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "_source": {
+      "excludes": [
+        "contenido_es",
+        "contenido_en"
+      ]
+    },
+    "properties": {
+      "doc_id": {
+        "type": "integer"
+      },
+      "db_id": {
+        "type": "integer"
+      },
+      "url": {
+        "type": "keyword"
+      },
+      "hash_url": {
+        "type": "keyword"
+      },
+      "dominio": {
+        "type": "keyword"
+      },
+      "ruta_relativa": {
+        "type": "keyword",
+        "index": false
+      },
+      "idioma": {
+        "type": "keyword"
+      },
+      "tamano_bytes": {
+        "type": "integer"
+      },
+      "norma": {
+        "type": "float"
+      },
+      "contenido_es": {
+        "type": "text",
+        "analyzer": "politica_es",
+        "similarity": "tfidf_propio",
+        "index_options": "freqs",
+        "norms": false
+      },
+      "contenido_en": {
+        "type": "text",
+        "analyzer": "politica_en",
+        "similarity": "tfidf_propio",
+        "index_options": "freqs",
+        "norms": false
+      }
+    }
+  }
+}

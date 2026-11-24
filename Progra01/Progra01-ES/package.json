@@ -1,0 +1,23 @@
+{
+  "name": "indexador-elastic",
+  "version": "1.0.0",
+  "description": "Indexador TF/IDF con Elasticsearch equivalente al indexador propio (Proyecto 2, IC-8060 RIT)",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "indexador-es": "src/cli.js"
+  },
+  "scripts": {
+    "indexar:minimo": "node src/cli.js indexar -c configuraciones/minimo.conf",
+    "indexar:estandar": "node src/cli.js indexar -c configuraciones/estandar.conf",
+    "indexar:avanzado": "node src/cli.js indexar -c configuraciones/avanzado.conf",
+    "benchmark": "node src/cli.js benchmark",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "~8.15.0"
+  }
+}

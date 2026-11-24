@@ -1,0 +1,19 @@
+# Términos canónicos con stemmer fijo (regla especial de aplicar_stemming_palabra en el propio).
+# Raíces calculadas con snowballstemmer (spanish / english), el mismo algoritmo Snowball que usa Lucene.
+realizador => realiz
+interpret => interpret
+interprete => interpret
+pelicula => pelicul
+largometraje => largometraj
+cortometraje => cortometraj
+documental => documental
+animacion => anim
+suspenso => suspens
+banda_sonora => banda_sonor
+fotografia => fotografi
+edicion => edicion
+film => film
+screenplay => screenplay
+screenwriter => screenwrit
+cast => cast
+producer => produc
