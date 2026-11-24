@@ -1,0 +1,8 @@
+__pycache__/
+.pytest_cache/
+.venv/
+salida/
+documento/*.aux
+documento/*.log
+documento/*.out
+documento/*.pdf

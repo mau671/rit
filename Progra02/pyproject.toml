@@ -1,0 +1,14 @@
+[project]
+name = "buscador"
+version = "0.1.0"
+description = "Encuadre: búsqueda, evaluación y métricas (Progra02)"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=9.2.0"]
+
+# Proyecto virtual: las carpetas (metricas/, ...) se importan directamente.
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

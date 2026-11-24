@@ -1,0 +1,420 @@
+\documentclass[11pt,spanish]{article}
+
+% =========================================================
+% PLANTILLA BASE PARA TAREAS ACADÉMICAS / INFORMES TÉCNICOS
+% =========================================================
+
+% --- Idioma y codificación para Tectonic / XeLaTeX ---
+\usepackage[spanish,es-tabla,es-noshorthands]{babel}
+\usepackage{fontspec}
+
+% --- Márgenes / papel ---
+\usepackage{geometry}
+\geometry{a4paper, margin=2.7cm}
+
+% --- Matemáticas ---
+\usepackage{amsmath,amssymb}
+
+% --- Tablas, enlaces y elementos visuales ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta,calc}
+\usepackage{enumitem}
+\usepackage{ragged2e}
+\usepackage{caption}
+\captionsetup{skip=6pt}
+\captionsetup[table]{position=top}
+\captionsetup[figure]{position=bottom}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+
+% --- Configuración de párrafo en bloque ---
+\makeatletter
+\renewcommand\paragraph{\@startsection{paragraph}{4}{\z@}%
+  {2.2ex \@plus1ex \@minus.2ex}%
+  {0.8ex}%
+  {\normalfont\normalsize\bfseries}}
+\makeatother
+
+% --- Listados de código con formato elegante ---
+\usepackage{listings}
+
+\definecolor{codebg}{rgb}{0.97,0.97,0.98}
+\definecolor{codeframe}{rgb}{0.85,0.85,0.88}
+\definecolor{commentgreen}{rgb}{0.13,0.54,0.13}
+\definecolor{keywordblue}{rgb}{0.0,0.2,0.7}
+\definecolor{stringpurple}{rgb}{0.6,0.1,0.4}
+
+% --- Colores para esquemas y diagramas TikZ ---
+\definecolor{softblue}{rgb}{0.88, 0.93, 1.0}
+\definecolor{softgreen}{rgb}{0.88, 0.96, 0.88}
+\definecolor{softorange}{rgb}{1.0, 0.92, 0.82}
+\definecolor{softpurple}{rgb}{0.93, 0.88, 0.98}
+\definecolor{softteal}{rgb}{0.85, 0.95, 0.95}
+\definecolor{softyellow}{rgb}{1.0, 0.95, 0.80}
+
+\lstdefinestyle{customcode}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=none,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    frame=single,
+    rulecolor=\color{codeframe},
+    commentstyle=\color{commentgreen}\itshape,
+    keywordstyle=\color{keywordblue}\bfseries,
+    stringstyle=\color{stringpurple},
+    xleftmargin=0.5em,
+    xrightmargin=0.5em
+}
+
+\lstdefinestyle{customcodenum}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=6pt,
+    numberstyle=\tiny\color{gray},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    frame=single,
+    rulecolor=\color{codeframe},
+    commentstyle=\color{commentgreen}\itshape,
+    keywordstyle=\color{keywordblue}\bfseries,
+    stringstyle=\color{stringpurple},
+    xleftmargin=1.5em,
+    xrightmargin=0.5em
+}
+
+\lstset{style=customcode}
+
+% --- Encabezado y pie de página: solo número de página en el pie ---
+\usepackage{fancyhdr}
+\setlength{\headheight}{15pt}
+\setlength{\footskip}{25pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancyfoot[C]{\thepage}
+
+\fancypagestyle{plain}{%
+    \fancyhf{}%
+    \renewcommand{\headrulewidth}{0pt}%
+    \renewcommand{\footrulewidth}{0pt}%
+    \fancyfoot[C]{\thepage}%
+}
+
+% --- \input de filas generadas dentro de tabular (el \input de LaTeX añade ganchos que rompen \bottomrule) ---
+\makeatletter\newcommand{\filas}[1]{\@@input #1 }\makeatother
+
+% --- Interlineado ---
+\linespread{1.2}
+\sloppy
+
+% =========================================================
+% DATOS DEL DOCUMENTO  (Progra02: lo de Persona C)
+% =========================================================
+\newcommand{\Institucion}{Instituto Tecnológico de Costa Rica}
+\newcommand{\Campus}{Escuela de Ingeniería en Computación}
+\newcommand{\DocumentoTitulo}{Progra02}
+\newcommand{\DocumentoSubtitulo}{Búsqueda y evaluación}
+\newcommand{\NombreBuscador}{Encuadre}
+\newcommand{\Curso}{IC-8060 Recuperación de Información Textual}
+\newcommand{\Profesor}{Aurelio Sanabria}
+\newcommand{\FechaDocumento}{\pendiente{fecha de entrega}}
+\newcommand{\PeriodoAcademico}{II Semestre}
+\newcommand{\AnioDocumento}{2026}
+
+% Lo que falta por llenar se ve en rojo: buscar "PENDIENTE" antes de entregar.
+\newcommand{\pendiente}[1]{\textcolor{red}{\textbf{[PENDIENTE: #1]}}}
+
+\newcommand{\AutoresPortada}{%
+\begin{minipage}{0.85\textwidth}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lr@{}}
+Santiago Espinoza Rendon & 2024156530 \\
+Fabián Araya Ortega & 2019159110 \\
+Mauricio González Prendas & 2024143009 \\
+José Fabián Zumbado Ruiz & \pendiente{carné} \\
+\end{tabular*}
+\end{minipage}%
+}
+
+\title{\DocumentoTitulo}
+\author{Santiago Espinoza Rendon, Fabián Araya Ortega, Mauricio González Prendas, José Fabián Zumbado Ruiz}
+\date{\FechaDocumento}
+
+\graphicspath{{../../Progra01/imgs/}{imgs/}}
+\usepackage{pgfplotstable}
+\pgfplotstableset{col sep=comma}
+\pgfplotsset{compat=1.16, width=\linewidth, height=6.5cm, grid=major,
+  every axis plot/.append style={thick}}
+
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\renewcommand{\arraystretch}{1.22}
+
+\newcommand{\MakeCover}{%
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+{\bfseries \huge \Institucion \par}
+\vspace{0.25cm}
+{\LARGE \Campus \par}
+\vspace{0.15cm}
+{\LARGE \Curso \par}
+\vspace{0.5cm}
+\includegraphics[width=0.22\linewidth]{logo.png}
+\vfill
+{\huge \bfseries \DocumentoTitulo: \DocumentoSubtitulo \par}
+\vspace{0.4cm}
+{\Large \textit{\NombreBuscador} \par}
+\vfill
+{\bfseries \LARGE Profesor: \par}
+\vspace{0.2cm}
+{\Large \Profesor \par}
+\vfill
+{\bfseries \LARGE Estudiantes: \par}
+\vspace{0.3cm}
+{\Large \AutoresPortada \par}
+\vfill
+{\bfseries\LARGE Fecha: \par}
+\vspace{0.2cm}
+{\Large \FechaDocumento \par}
+\vfill
+{\LARGE \PeriodoAcademico \par}
+{\LARGE \AnioDocumento \par}
+\end{titlepage}%
+}
+
+\begin{document}
+\hypersetup{pageanchor=false}
+\MakeCover
+\hypersetup{pageanchor=true}
+\setcounter{page}{1}
+
+% =========================================================
+\section{Estadísticas de uso}
+% =========================================================
+Las cifras de esta sección se generan con \texttt{python -m metricas --documento documento}
+a partir de los juicios de relevancia guardados por la interfaz de evaluación, de modo que
+el documento y la página de métricas siempre muestran los mismos números.
+\pendiente{correr el comando con los juicios reales; mientras tanto las tablas y figuras salen vacías}
+
+\subsection{Participación y juicios}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{@{}lr@{}}
+    \toprule
+    \textbf{Indicador} & \textbf{Valor} \\
+    \midrule
+    \filas{tablas/uso.tex}
+    \bottomrule
+  \end{tabular}
+  \caption{Participación en las sesiones de evaluación.}\label{tab:uso}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[ybar, height=5cm, width=0.7\linewidth, bar width=22pt, ymin=0,
+      xtick=data, xticklabels from table={datos/juicios_por_evaluador.csv}{evaluador},
+      ylabel={Juicios}, nodes near coords, enlarge x limits=0.3,
+      enlarge y limits={upper, value=0.2}]
+      \addplot[fill=teal!70] table[x=n, y=juicios, col sep=comma]{datos/juicios_por_evaluador.csv};
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Juicios guardados por evaluador.}
+\end{figure}
+
+\pendiente{describir quiénes evaluaron (perfil, cuántas sesiones, cómo se coordinaron) y
+adjuntar una captura de la interfaz de evaluación}
+
+\subsection{Métricas utilizadas y su justificación}
+
+Con una colección sin juicios previos hay que construirlos con personas, y las métricas deben
+elegirse según lo que esos juicios permiten medir~\cite{sanderson2010}. Se usan cuatro,
+definidas para una consulta con ranking $d_1,\dots,d_n$, relevancia binaria $r_i$ y
+calificación $g_i$.
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{\linewidth}{@{}l>{\RaggedRight}p{5.2cm}Y@{}}
+    \toprule
+    \textbf{Métrica} & \textbf{Definición} & \textbf{Por qué se eligió} \\
+    \midrule
+    P@$k$ &
+      $\displaystyle \frac{1}{k}\sum_{i=1}^{k} r_i$ &
+      Mide lo que ve el usuario en la primera página de resultados; es simple de interpretar
+      y no necesita conocer todos los relevantes~\cite{manning2008}. \\
+    MAP &
+      $\displaystyle \frac{1}{|Q|}\sum_{q}\frac{1}{|R_q|}\sum_{i} P@i\cdot r_i$ &
+      Resume la calidad del orden en toda la lista en un solo número y es una medida
+      de uso muy extendido para comparar sistemas~\cite{manning2008}. \\
+    nDCG@$k$ &
+      $\displaystyle \frac{\sum_{i=1}^{k} g_i/\log_2(i+1)}{\text{DCG ideal}}$ &
+      Aprovecha la relevancia graduada (0, 1, 2) y descuenta lo relevante que aparece
+      abajo~\cite{jarvelin2002}. \\
+    MRR &
+      $\displaystyle \frac{1}{|Q|}\sum_{q}\frac{1}{\text{pos. del primer relevante}}$ &
+      Refleja consultas donde basta un buen resultado~\cite{voorhees1999}. \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Métricas de calidad del ranking.}\label{tab:def-metricas}
+\end{table}
+
+El acuerdo entre evaluadores se mide con el coeficiente $\kappa$ de
+Cohen~\cite{cohen1960}, $\kappa=(p_o-p_e)/(1-p_e)$, y se lee con la escala (orientativa) de Landis y
+Koch~\cite{landis1977}. Cuando dos o más personas juzgan el mismo documento, la calificación
+se promedia para nDCG y se considera relevante si al menos la mitad lo marcó $\ge 1$.
+Que los evaluadores discrepen no invalida la comparación entre sistemas~\cite{voorhees2000}.
+
+\pendiente{justificar con criterio propio por qué estas cuatro y no otras, a la luz de la
+necesidad de información del grupo}
+
+\subsection{Resultados}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{@{}lr@{}}
+    \toprule
+    \textbf{Métrica} & \textbf{Promedio} \\
+    \midrule
+    \filas{tablas/metricas_global.tex}
+    \bottomrule
+  \end{tabular}
+  \caption{Métricas promedio sobre las consultas con juicios.}\label{tab:global}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[xlabel={Posición en el ranking}, ylabel={Precisión promedio}, ymin=0, ymax=1,
+      xtick={1,...,10}]
+      \addplot[blue!70!black, mark=*] table[x=posicion, y=precision, col sep=comma]{datos/curva_precision.csv};
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Precisión promedio acumulada por posición.}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[ybar, bar width=5pt, ymin=0, ymax=1, legend pos=outer north east,
+      xtick=data, xticklabels from table={datos/por_consulta.csv}{query_id},
+      x tick label style={font=\scriptsize}, ylabel={Valor}]
+      \addplot[fill=blue!60]   table[x=n, y=p,    col sep=comma]{datos/por_consulta.csv};
+      \addplot[fill=orange!80] table[x=n, y=ap,   col sep=comma]{datos/por_consulta.csv};
+      \addplot[fill=teal!70]   table[x=n, y=ndcg, col sep=comma]{datos/por_consulta.csv};
+      \legend{P@10, AP, nDCG@10}
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Métricas por consulta.}
+\end{figure}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    \textbf{Id} & \textbf{Consulta} \\
+    \midrule
+    \filas{tablas/consultas.tex}
+    \bottomrule
+  \end{tabular}
+  \caption{Consultas evaluadas.}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{@{}lrrrrr@{}}
+    \toprule
+    \textbf{Id} & \textbf{P@10} & \textbf{Recall@10} & \textbf{AP} & \textbf{nDCG@10} & \textbf{RR} \\
+    \midrule
+    \filas{tablas/metricas_consulta.tex}
+    \bottomrule
+  \end{tabular}
+  \caption{Detalle por consulta (``--'' indica métrica no definida).}
+\end{table}
+
+\subsection{Limitaciones}
+
+Los documentos sin juzgar se tratan como no relevantes, y las medidas habituales dejan de
+ser robustas cuando los juicios son muy incompletos~\cite{buckley2004}; por eso se reporta
+la cobertura de juicios. Además, Recall@$k$ se
+calcula sobre el conjunto de documentos juzgados; si solo se juzga el top-$k$ vale 1 por
+construcción y no debe presentarse como resultado. \pendiente{indicar la cobertura real de
+juicios y cuántos evaluadores participaron por consulta}
+
+% =========================================================
+\section{Conclusiones}
+% =========================================================
+
+\subsection{¿Se cumplió la necesidad de información inicial?}
+\pendiente{responder con las métricas de la Tabla~\ref{tab:global}, citando la necesidad de
+información definida en Progra00 y qué documentos concretos la satisfacen o no}
+
+\subsection{Conclusiones del grupo}
+Mínimo 20; cada integrante aporta cerca de 7 desde su parte y Persona C las integra.
+Cada conclusión debe apoyarse en un número, un gráfico o una observación de uso.
+
+\begin{enumerate}[label=\textbf{C\arabic*.}, leftmargin=*]
+  % Persona A: búsqueda y resultados (7)
+  \item \pendiente{A-1: efecto de la búsqueda avanzada sobre los resultados}
+  \item \pendiente{A-2}
+  \item \pendiente{A-3}
+  \item \pendiente{A-4}
+  \item \pendiente{A-5}
+  \item \pendiente{A-6}
+  \item \pendiente{A-7}
+  % Persona B: evaluación (7)
+  \item \pendiente{B-1: dificultad de conseguir evaluadores y qué se aprendió}
+  \item \pendiente{B-2}
+  \item \pendiente{B-3}
+  \item \pendiente{B-4}
+  \item \pendiente{B-5}
+  \item \pendiente{B-6}
+  \item \pendiente{B-7}
+  % Persona C: métricas (7)
+  \item \pendiente{C-1: comparar P@10 con MAP y qué dice la diferencia}
+  \item \pendiente{C-2: consultas con mejor y peor desempeño y por qué}
+  \item \pendiente{C-3: qué aporta nDCG frente a las métricas binarias}
+  \item \pendiente{C-4: MRR y consultas donde basta un buen resultado}
+  \item \pendiente{C-5: acuerdo entre evaluadores ($\kappa$) y su efecto en las métricas}
+  \item \pendiente{C-6: sesgo de tratar lo no juzgado como no relevante}
+  \item \pendiente{C-7: desarrollo adicional y su efecto medido}
+\end{enumerate}
+
+% =========================================================
+\begin{thebibliography}{9}
+% Referencias verificadas el 24/11/2026 contra DOI, NIST, ACM y editoriales.
+\bibitem{manning2008} C.~D. Manning, P.~Raghavan y H.~Schütze, \emph{Introduction to Information Retrieval}, cap.~8 (pp.~139--161), Cambridge University Press, 2008.
+\bibitem{jarvelin2002} K.~Järvelin y J.~Kekäläinen, ``Cumulated gain-based evaluation of IR techniques'', \emph{ACM Transactions on Information Systems}, 20(4), pp.~422--446, 2002.
+\bibitem{voorhees1999} E.~M. Voorhees, ``The TREC-8 Question Answering Track Report'', en \emph{Proc. TREC-8 (1999)}, NIST SP 500-246, pp.~77--82, 2000.
+\bibitem{cohen1960} J.~Cohen, ``A coefficient of agreement for nominal scales'', \emph{Educational and Psychological Measurement}, 20(1), pp.~37--46, 1960.
+\bibitem{landis1977} J.~R. Landis y G.~G. Koch, ``The measurement of observer agreement for categorical data'', \emph{Biometrics}, 33(1), pp.~159--174, 1977.
+\bibitem{sanderson2010} M.~Sanderson, ``Test collection based evaluation of information retrieval systems'', \emph{Foundations and Trends in Information Retrieval}, 4(4), pp.~247--375, 2010.
+\bibitem{buckley2004} C.~Buckley y E.~M. Voorhees, ``Retrieval evaluation with incomplete information'', en \emph{Proc. SIGIR}, pp.~25--32, 2004.
+\bibitem{voorhees2000} E.~M. Voorhees, ``Variations in relevance judgments and the measurement of retrieval effectiveness'', \emph{Information Processing \& Management}, 36(5), pp.~697--716, 2000.
+\end{thebibliography}
+
+\end{document}
