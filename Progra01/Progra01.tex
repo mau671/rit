@@ -5,7 +5,7 @@
 % =========================================================
 
 % --- Idioma y codificación para Tectonic / XeLaTeX ---
-\usepackage[spanish,es-tabla]{babel}
+\usepackage[spanish,es-tabla,es-noshorthands]{babel}
 \usepackage{fontspec}
 
 % --- Márgenes / papel ---
@@ -13,7 +13,7 @@
 \geometry{a4paper, margin=2.7cm}
 
 % --- Matemáticas ---
-\usepackage{amsmath}
+\usepackage{amsmath,amssymb}
 
 % --- Tablas, enlaces y elementos visuales ---
 \usepackage{array}
@@ -24,6 +24,8 @@
 \usepackage{float}
 \usepackage{xcolor}
 \usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
 \usetikzlibrary{positioning,shapes.geometric,arrows.meta,calc}
 \usepackage{enumitem}
 \usepackage{ragged2e}
@@ -123,6 +125,9 @@
     \fancyfoot[C]{\thepage}%
 }
 
+% --- \input de filas generadas dentro de tabular (el \input de LaTeX añade ganchos que rompen \bottomrule) ---
+\makeatletter\newcommand{\filas}[1]{\@@input #1 }\makeatother
+
 % --- Interlineado ---
 \linespread{1.2}
 \sloppy
@@ -148,6 +153,7 @@
 Santiago Espinoza Rendon & 2024156530 \\
 Fabián Araya Ortega & 2019159110 \\
 Mauricio González Prendas & 2024143009 \\
+% José Fabián Zumbado Ruiz & <carné> \\  % ← completar el carné y descomentar
 \end{tabular*}
 \end{minipage}%
 }
@@ -238,106 +244,346 @@ Mauricio González Prendas & 2024143009 \\
 \pagestyle{fancy}
 
 % =========================================================
-% SECCIÓN 1: POLÍTICAS DE NORMALIZACIÓN
+% SECCIÓN 1: INTRODUCCIÓN
+% =========================================================
+\section{Introducción}
+
+Este documento describe cómo se normaliza el texto antes de indexarlo y qué efecto tiene esa decisión sobre el índice. Una consulta solo encuentra un documento si ambos se reducen a los mismos términos; por eso la normalización define qué significa que dos palabras sean ``la misma'' y condiciona tanto el tamaño del índice como la calidad de los resultados~\cite{manning2008}.
+
+Se definieron tres configuraciones de normalización (mínima, intermedia y agresiva) y se construyó con cada una un índice sobre la misma muestra de la colección. La sección~\ref{sec:politicas} explica cada política y su justificación, la sección~\ref{sec:estadisticas} presenta las estadísticas medidas y la sección~\ref{sec:estructura-binaria} describe el formato binario del archivo. Las listas de palabras vacías, sinónimos y tesauro viven en \texttt{recursos/} y las leen por igual el indexador propio y el de Lucene; los casos de prueba compartidos están en \texttt{casos\_prueba/normalizacion.json}.
+
+% =========================================================
+% SECCIÓN 2: POLÍTICAS DE NORMALIZACIÓN
 % =========================================================
 \section{Políticas de normalización}
+\label{sec:politicas}
 
-Con el propósito de transformar las cadenas de texto heterogéneas recolectadas por la araña en unidades léxicas homogéneas y comparables, el indexador articula sus decisiones de preprocesamiento mediante un componente modular de normalización, el cual permite habilitar o prescindir de distintos filtros según los parámetros definidos en la configuración.
+Cada política responde a tres preguntas: qué se hace, por qué, y dónde se aplica en cada indexador. La consulta recibe exactamente la misma normalización que el documento; si no fuera así, un término buscado nunca coincidiría con el indexado. El buscador reconstruye la normalización del índice a partir de las banderas guardadas en el encabezado del archivo, de modo que una consulta contra la política mínima no se reduce como la intermedia.
 
-\subsection{Tokenización y limpieza previa}
-Previo a la segmentación léxica, el texto atraviesa una etapa de saneamiento basada en el estándar Unicode NFKC, orientada a descomponer caracteres de ancho completo y ligaduras tipográficas como \textit{fi} o \textit{fl}, homologando a su vez comillas curvas y guiones tipográficos. A partir del texto limpio, la división en tokens se lleva a cabo mediante una expresión regular que reconoce marcadores semánticos entre corchetes angulares y admite palabras con apóstrofes o guiones internos, elementos habituales dentro del dominio audiovisual en términos como \textit{sci-fi}, \textit{post-credits} o \textit{spider-man}:
-\begin{lstlisting}[language=Python]
-re_token = r"<[A-Z0-9_]+>|[^\W_]+(?:[-'_][^\W_]+)*"
-\end{lstlisting}
+\subsection{Tokenización y limpieza previa (P1)}
+\textbf{Descripción.} El texto se pasa a la forma Unicode NFKC, se unifican las comillas y rayas tipográficas, y se parte en tokens con la expresión regular \texttt{<[A-Z0-9\_]+>|[\textasciicircum\textbackslash W\_]+(?:[-'\_][\textasciicircum\textbackslash W\_]+)*}. Una palabra con guion o apóstrofe interno (\textit{sci-fi}, \textit{spider-man}, \textit{o'brien}) es un solo token, y los marcadores sintéticos como \texttt{<NUM>} se conservan enteros.
 
-\subsection{Conversión a minúsculas}
-A fin de evitar dispersión léxica y asegurar que variantes como \textit{``Cinema''}, \textit{``CINEMA''} y \textit{``cinema''} converjan hacia una misma entrada del diccionario, los tokens alfanuméricos se transforman a minúsculas de manera uniforme, preservando intactos únicamente los marcadores sintéticos generados por el propio motor.
+\textbf{Justificación.} NFKC convierte ligaduras y caracteres de ancho completo a su forma ordinaria, de modo que cadenas que se ven igual quedan con la misma representación binaria~\cite{unicode15}. Partir \textit{sci-fi} en dos tokens perdería el término que el usuario escribe, porque ninguna de las dos mitades significa lo mismo que la palabra completa.
 
-\subsection{Filtrado de palabras vacías}
-Con el fin de remover términos de altísima frecuencia pero nulo valor discriminatorio, se estructuró un catálogo exhaustivo de palabras vacías para español e inglés que abarca artículos, preposiciones, conjunciones, pronombres y verbos auxiliares, resolviendo la pertenencia de cada término en tiempo constante $O(1)$ mediante conjuntos inmutables en memoria.
+\textbf{Dónde.} Propio: \texttt{normalizador.py}, paso de limpieza y \texttt{RE\_TOKEN}. Lucene: \texttt{PatternReplaceCharFilter} para las comillas y un \texttt{PatternTokenizer} con la misma expresión (la sintaxis de Java la acepta sin cambios).
 
-\subsection{Reducción morfológica multilingüe}
-Para colapsar las variantes flexivas y derivativas hacia una raíz común, se incorporó el algoritmo Snowball para inglés y español, apoyado en un mecanismo heurístico que determina el idioma predominante a partir de la proporción de palabras vacías y la presencia de grafías propias del español como tildes o la letra eñe.
+\subsection{Minúsculas (P2)}
+\textbf{Descripción.} Todo token alfanumérico pasa a minúsculas; los marcadores \texttt{<...>} no se tocan.
 
-Respecto a la eficiencia computacional del proceso, durante las primeras pruebas sobre guiones que superaban los noventa mil caracteres, la ejecución reiterada del algoritmo sobre palabras sumamente repetidas representaba el mayor costo computacional del proceso; por ello, se implementó una tabla de dispersión en memoria que almacena las raíces ya calculadas, evitando procesar nuevamente términos conocidos y reduciendo el tiempo de normalización en más de un 80\%.
+\textbf{Justificación.} \textit{Cinema}, \textit{CINEMA} y \textit{cinema} deben ser una sola entrada del diccionario; distinguirlas solo dispersaría los postings~\cite{manning2008}. El costo es que se pierde la diferencia entre un nombre propio y una palabra común (\textit{Hook} frente a \textit{hook}), pérdida que se asume porque la colección es de texto libre con capitalización irregular.
 
-\subsection{Normalización de entidades temporales y números}
-Dado que en las búsquedas audiovisuales las referencias cronológicas suelen ser determinantes para acotar estrenos o épocas de producción, el normalizador incorpora reglas para distinguir fechas completas y años de interés histórico —acotados entre 1888 y 2099—, sustituyéndolos respectivamente por etiquetas sintéticas como \texttt{<FECHA>} o \texttt{<ANIO\_YYYY>}, mientras que las cantidades numéricas generales se homologan bajo el identificador \texttt{<NUM>} o se omiten en función de la política activa.
+\textbf{Dónde.} Propio: \texttt{str.lower}. Lucene: \texttt{LowerCaseFilter}.
 
-\subsection{Tesauro de equivalencias audiovisuales}
-Con el propósito de tender un puente entre consultas breves y documentos redactados en distintos estilos o idiomas, se elaboró un tesauro enfocado en la producción cinematográfica y televisiva que canaliza sinónimos habituales hacia un único lema canónico, permitiendo que variantes terminológicas confluyan al mismo concepto:
-\begin{itemize}
-    \item \textit{película, filme, motion picture, movie, cinema} $\longrightarrow$ \texttt{film}
-    \item \textit{director, cineasta, filmmaker, realizadora} $\longrightarrow$ \texttt{realizador}
-    \item \textit{screenplay, guion, libreto, script} $\longrightarrow$ \texttt{screenplay}
-    \item \textit{actor, actriz, reparto, star, intérprete} $\longrightarrow$ \texttt{interprete}
-    \item \textit{soundtrack, ost, banda sonora, score} $\longrightarrow$ \texttt{banda\_sonora}
-\end{itemize}
+\subsection{Palabras vacías (P3)}
+\textbf{Descripción.} Se descartan los tokens que aparecen en \texttt{recursos/stopwords\_es.txt} o \texttt{stopwords\_en.txt} (una palabra por línea; \texttt{\#} inicia un comentario). Del inglés también se quitan las contracciones (\textit{'s, 're, 've, 'll, 'd, 'm}) y las formas \textit{n't}, de modo que \textit{it's} produce \textit{it} y este se descarta como vacía. Las dos listas se aplican a todo documento, sin importar su idioma, porque la colección mezcla español e inglés dentro de un mismo texto.
 
-% =========================================================
-% SECCIÓN 2: ESTADÍSTICAS Y EVALUACIÓN DE RENDIMIENTO
-% =========================================================
-\section{Estadísticas y evaluación de rendimiento de los índices}
+\textbf{Justificación.} Las palabras de altísima frecuencia ocupan las listas de postings más largas y casi no discriminan entre documentos; con ponderación $tf\text{-}idf$ su peso ya es cercano a cero~\cite{salton1988}. Quitarlas reduce el índice a costa de impedir consultas que sean solo de palabras vacías, lo que en este dominio no tiene valor. Se evitaron entradas ambiguas con el dominio: por ejemplo, no se incluyó \textit{star} porque forma parte de \textit{Star Wars}.
 
-Con el propósito de evaluar experimentalmente el impacto de las decisiones lingüísticas sobre el índice, se estructuraron tres perfiles en archivos de configuración independientes:
-\begin{itemize}
-    \item \textbf{Política 1, mínima:} concebida como línea base, se limita a la tokenización alfanumérica y al uso exclusivo de minúsculas, prescindiendo deliberadamente del filtrado de palabras vacías, la lematización y la detección de entidades.
-    \item \textbf{Política 2, estándar:} orientada al modelo clásico de recuperación de información, combina minúsculas, supresión de puntuación, filtrado de palabras vacías en ambos idiomas y reducción morfológica mediante Snowball.
-    \item \textbf{Política 3, avanzada:} diseñada para enriquecer la semántica del dominio audiovisual, añade a los filtros anteriores la normalización de fechas, la detección de años históricos y la unificación de sinónimos a través del tesauro.
-\end{itemize}
+\textbf{Dónde.} Propio: \texttt{cargar\_lista\_palabras}. Lucene: \texttt{WordlistLoader.getWordSet(reader, "\#")} con \texttt{StopFilter}~\cite{lucene-wordlist}.
 
-La construcción de cualquiera de los índices a partir de su archivo de configuración se ejecuta de forma desacoplada mediante la herramienta de línea de comandos:
-\begin{lstlisting}[language=bash, caption={Construcción del índice mediante archivo de configuración.}]
-uv run indexador indexar --config configuraciones/estandar.conf --limite 1000
-\end{lstlisting}
+\subsection{Reducción morfológica (P4)}
+\textbf{Descripción.} Se aplica el algoritmo Snowball del idioma del documento. El idioma se decide contando, entre los primeros 300 tokens, cuántos están en cada lista de palabras vacías; gana el inglés solo si supera estrictamente al español, y un empate o la ausencia de votos da español. Un documento usa un único stemmer.
 
-\subsection{Métricas empíricas de los tres índices}
+\textbf{Justificación.} La reducción unifica formas flexivas (\textit{movies}, \textit{movie}) y mejora la cobertura, pero es una heurística: Porter muestra que se trata de quitar sufijos con reglas, no de hallar la forma de diccionario~\cite{porter1980,porter2001}. Por eso en este documento se habla de \textbf{stemming}, no de lematización. Los resultados empíricos de Harman muestran que reducir sufijos no mejora de forma consistente la recuperación en colecciones pequeñas~\cite{harman1991}, así que la política mínima se conserva como línea base para medir el efecto real sobre esta colección.
 
-Con el fin de contrastar las tres políticas bajo condiciones controladas sobre una muestra de quinientos documentos, se utilizó el procedimiento de evaluación automatizado:
-\begin{lstlisting}[language=bash, caption={Ejecución comparativa de las tres políticas de indexación.}]
-uv run indexador benchmark --limite 500
-\end{lstlisting}
+\textbf{Dónde.} Propio: \texttt{snowballstemmer} con memoria de las raíces ya calculadas. Lucene: \texttt{SnowballFilter} con el mismo idioma; otros stemmers, como \texttt{PorterStemFilter}, no son equivalentes y no deben usarse.
 
-Los indicadores cuantitativos resultantes de la ejecución se resumen en la Tabla~\ref{tab:benchmark-indices}. La memoria de cada política se mide con la marca de agua alta del proceso (\texttt{VmHWM}), que se reinicia antes de cada ejecución; de lo contrario la segunda y la tercera política heredarían el pico de la primera y la comparación no sería válida.
+\subsection{Tildes y la letra eñe (P5)}
+\textbf{Descripción.} En la política agresiva se pliegan las tildes y diéresis (\textit{película} $\to$ \textit{pelicula}), pero la \textit{ñ} se conserva: \textit{año} y \textit{ano} siguen siendo distintas.
+
+\textbf{Justificación.} Quien busca sin tildes debe encontrar texto con tildes. En cambio \textit{año}/\textit{ano} son palabras distintas y colapsarlas crea ruido real. Plegar solo las tildes de las vocales es la excepción que evita ese error.
+
+\textbf{Dónde.} Propio: \texttt{remover\_diacriticos}. Lucene: un \texttt{MappingCharFilter} propio; \texttt{ASCIIFoldingFilter} no sirve tal cual porque también convierte \textit{ñ} en \textit{n}.
+
+\subsection{Fechas (P6)}
+\textbf{Descripción.} En la política agresiva, cada fecha completa (\texttt{25/12/1977}, \texttt{1977-12-25}, \textit{25 de diciembre de 1977}, \textit{December 25, 1977}) se sustituye por \texttt{<FECHA>}. Un año suelto entre 1888 y 2099 se sustituye por \texttt{<ANIO\_aaaa>}, de modo que el año de estreno sigue siendo buscable.
+
+\textbf{Justificación.} Una fecha completa casi nunca se busca tal cual, pero ocupa un término distinto por cada día del calendario; el año sí es una consulta frecuente (\textit{1994}). El rango 1888--2099 acota los años plausibles para una obra audiovisual y evita convertir en año cualquier número de cuatro cifras.
+
+\textbf{Dónde.} Propio: \texttt{RE\_FECHA\_TEXTUAL} y las expresiones numéricas. Lucene: \texttt{PatternReplaceCharFilter} con las mismas expresiones.
+
+\subsection{Números (P7)}
+\textbf{Descripción.} Un número (\texttt{\textbackslash d+([.,]\textbackslash d+)?}) se puede conservar, descartar o reemplazar por \texttt{<NUM>}; la política agresiva usa \texttt{<NUM>}. Los años y las fechas ya se trataron en P6 y no llegan a este paso.
+
+\textbf{Justificación.} Los números de la colección (duraciones, puntajes, minutos, versiones) casi no sirven como consulta, pero llenan el vocabulario con términos únicos. Con \texttt{<NUM>} se conserva la información de que hubo un número sin pagar un término por cada valor.
+
+\textbf{Dónde.} Propio: \texttt{RE\_NUMERO}. Lucene: \texttt{PatternReplaceCharFilter}.
+
+\subsection{Sinónimos y tesauro (P8)}
+\textbf{Descripción.} Dos archivos con el mismo formato (\texttt{variante, variante => descriptor}) llevan variantes a un solo descriptor. \texttt{sinonimos.txt} cubre equivalencias de obras, formatos y técnica (\textit{película, movie, cine, filme} $\to$ \texttt{film}; \textit{guion, script} $\to$ \texttt{screenplay}; \textit{soundtrack, ost} $\to$ \texttt{banda\_sonora}). \texttt{tesauro.txt} cubre oficios y créditos (\textit{director, cineasta, filmmaker} $\to$ \texttt{realizador}; \textit{actor, actriz, intérprete} $\to$ \texttt{interprete}). Solo se mapean tokens sueltos y, si una variante está en ambos archivos, gana el tesauro. Los descriptores se reducen con el stemmer de su propio idioma, para que \texttt{film} y \texttt{realizador} den el mismo término en cualquier documento.
+
+\textbf{Justificación.} Un tesauro es un vocabulario controlado: un descriptor preferido y términos no preferidos que remiten a él~\cite{iso25964}. Aplicarlo al indexar y al consultar permite que una consulta en español encuentre un documento en inglés. Los resultados de expansión léxica con WordNet fueron pobres cuando se aplicó a ciegas~\cite{voorhees1994}; por eso las listas son cortas, escritas a mano y solo incluyen variantes que significan lo mismo en el dominio. Se excluyeron las ambiguas: \textit{star} (Star Wars), \textit{score} (puntaje), \textit{short}, \textit{feature}, \textit{editor}, \textit{composer} y \textit{protagonista}.
+
+\textbf{Dónde.} Propio: \texttt{cargar\_sinonimos}. Lucene: \texttt{SolrSynonymParser} para ambos archivos~\cite{lucene-solrsyn} con \texttt{SynonymGraphFilter}, usado como reemplazo (\texttt{expand=false}).
+
+\subsection{Nombres propios (P9)}
+\textbf{Descripción.} No se hace reconocimiento de entidades. Un nombre propio recibe el mismo trato que cualquier otro token: minúsculas, tildes (según la política) y, con stemming, reducción. \textit{George Lucas} produce \texttt{georg luca}.
+
+\textbf{Justificación.} El reconocimiento de entidades nombradas es una tarea con sus propios modelos y su propia evaluación~\cite{nadeau2007}, que excede el alcance del proyecto. Como la consulta pasa por la misma reducción, \textit{George Lucas} sigue encontrando \textit{George Lucas}; lo que se pierde es distinguir entre un apellido y una palabra común, y que el stemmer puede unir nombres distintos con la misma raíz.
+
+\subsection{Las tres configuraciones}
+
+La Tabla~\ref{tab:politicas} resume qué activa cada configuración. Cada una es un archivo \texttt{.conf} en \texttt{configuraciones/}.
 
 \begin{table}[htbp]
   \centering
   \footnotesize
-  \caption{Comparativa cuantitativa de los tres índices generados.}
-  \label{tab:benchmark-indices}
-  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrrrrrr@{}}
+  \caption{Pasos activos en cada configuración de normalización.}
+  \label{tab:politicas}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lccc@{}}
     \toprule
-    \textbf{Política} & \textbf{Docs} & \textbf{Vocabulario} & \textbf{Postings} & \textbf{Tamaño} & \textbf{Tiempo} & \textbf{RAM} & \textbf{Bytes/Doc} \\
+    \textbf{Paso} & \textbf{Mínima} & \textbf{Intermedia} & \textbf{Agresiva} \\
     \midrule
-    \texttt{minimo} & 500 & $90\,728$ & $636\,579$ & $9.89$ MB & $6.04$ s & $88.1$ MB & $20\,740.9$ \\
-    \texttt{estandar} & 500 & $61\,068$ & $486\,847$ & $7.28$ MB & $10.00$ s & $90.1$ MB & $15\,264.1$ \\
-    \texttt{avanzado} & 500 & $59\,395$ & $478\,619$ & $7.14$ MB & $14.75$ s & $90.1$ MB & $14\,979.5$ \\
+    Limpieza Unicode y tokenización (P1) & \checkmark & \checkmark & \checkmark \\
+    Minúsculas (P2) & \checkmark & \checkmark & \checkmark \\
+    Contracciones y palabras vacías (P3) & -- & \checkmark & \checkmark \\
+    Stemming Snowball (P4) & -- & \checkmark & \checkmark \\
+    Plegado de tildes, conserva \textit{ñ} (P5) & -- & -- & \checkmark \\
+    Fechas y años (P6) & -- & -- & \checkmark \\
+    Números a \texttt{<NUM>} (P7) & -- & -- & \checkmark \\
+    Sinónimos y tesauro (P8) & -- & -- & \checkmark \\
+    \midrule
+    Archivo & \texttt{minimo.conf} & \texttt{estandar.conf} & \texttt{avanzado.conf} \\
     \bottomrule
   \end{tabular*}
 \end{table}
 
-\subsection{Análisis comparativo de resultados}
+\textbf{Mínima.} Ventaja: es la línea base, no pierde ninguna palabra y cualquier consulta literal funciona. Desventaja: el vocabulario es el más grande y las palabras vacías llenan las listas de postings.
 
-Al examinar las métricas registradas, se observan contrastes claros originados por el grado de normalización aplicado:
-\begin{enumerate}
-    \item \textbf{Compresión léxica y economía de almacenamiento:} la combinación de palabras vacías y reducción morfológica en la política estándar contrajo el vocabulario en un 32.7\% frente a la línea base, pasando de $90\,728$ a $61\,068$ términos únicos, lo cual derivó en un ahorro del 26.4\% en el espacio en disco al disminuir el archivo de $9.89$ MB a $7.28$ MB y suprimir casi ciento cincuenta mil ocurrencias redundantes.
-    \item \textbf{Consolidación semántica del tesauro:} en la política avanzada, el vocabulario experimentó una compactación complementaria hasta situarse en $59\,395$ términos, fruto de encauzar términos afines y variantes lingüísticas hacia lemas comunes, incrementando la densidad semántica de cada lista de ocurrencias.
-    \item \textbf{Estabilidad en el uso de memoria:} a pesar de procesar documentos voluminosos con decenas de miles de palabras cada uno, la memoria residente requerida por el indexador se mantuvo cerca de los $90$ MB, corroborando que el esquema de partición en bloques temporales y su posterior integración externa evitan la saturación de los recursos del sistema. El particionamiento ya no se decide contando documentos, sino comparando la memoria residente real del proceso contra el límite declarado en el archivo de configuración, de modo que un tramo de la colección con guiones extensos no desborda la memoria disponible.
-\end{enumerate}
+\textbf{Intermedia.} Ventaja: reduce el vocabulario y el archivo sin alterar el significado de las palabras. Desventaja: el stemming une palabras que no deberían unirse y una consulta sin tildes no encuentra texto con tildes.
 
-Una prueba de escalado sobre veinte mil documentos de la misma colección confirmó que el esquema se sostiene fuera de la muestra: el índice se construyó en $160.8$ segundos con $539\,511$ términos y $13\,637\,739$ ocurrencias, un archivo de $172.6$ MB y un pico de $552$ MB de memoria residente, lo que proyecta alrededor de una hora y $3.7$ GB para los $317\,657$ documentos de la colección. Esa medición es la que motiva que el límite de memoria de SPIMI se evalúe contra el consumo real del proceso y no contra un número fijo de documentos.
+\textbf{Agresiva.} Ventaja: mayor reducción y tolera consultas sin tildes y en otro idioma gracias al tesauro. Desventaja: pierde la fecha y los valores numéricos exactos, y cada regla del tesauro es una decisión editorial que puede equivocarse.
 
-Para comprobar la operatividad del modelo vectorial y la validez de las normas euclidianas calculadas, es posible formular consultas puntuales resueltas mediante similitud coseno directamente sobre el archivo binario generado:
-\begin{lstlisting}[language=bash, caption={Consulta vectorial con similitud coseno sobre el índice.}]
-uv run indexador buscar salida/indice_estandar.idx "film director" --top 5
-\end{lstlisting}
+\subsection{Limitaciones}
+\begin{itemize}
+  \item Un documento usa un solo stemmer; un guion con diálogos en los dos idiomas se reduce con el del idioma dominante.
+  \item Las reglas de sinónimos son de un solo token: no hay frases como \textit{banda sonora} $\to$ \texttt{banda\_sonora}, porque el tokenizador ya separó las palabras.
+  \item Los nombres propios no se detectan, y el stemmer puede reducirlos.
+  \item Un número se pierde en la política agresiva; \textit{Ocean's 11} solo conserva \textit{ocean} y \texttt{<NUM>}.
+\end{itemize}
 
-La consulta se tokeniza con la misma normalización con la que se construyó el índice, reconstruida a partir de la máscara de banderas del encabezado y del modelo de ponderación almacenado en sus bytes reservados. Sin ese acoplamiento, una consulta contra la política mínima se lematizaba igual que la estándar y producía cero resultados aunque los términos existieran en el vocabulario. Cuando ninguna variante de un término aparece en el léxico, el buscador informa los términos ausentes y propone entradas cercanas por prefijo, en lugar de devolver un conjunto vacío sin explicación.
-
-Además de las consultas puntuales, el subcomando \texttt{inspeccionar} admite la bandera \texttt{--verificar}, que recorre el archivo y comprueba que los desplazamientos del encabezado, el orden lexicográfico del vocabulario y la concatenación exacta de los bloques de ocurrencias sean coherentes con el tamaño real del archivo. La misma comprobación se ejecuta sobre los tres índices almacenados como parte de las pruebas automatizadas.
+\subsection{Casos de prueba compartidos}
+El archivo \texttt{casos\_prueba/normalizacion.json} contiene 28 casos ``texto $\to$ tokens esperados'', cada uno con el resultado esperado para las tres políticas, agrupados por tema (tokenización, palabras vacías, fechas, tesauro, tildes, stemming, nombres, números, casos de borde e integración). Cualquiera de los dos indexadores debe producir exactamente esos tokens. El indexador propio los verifica con \texttt{uv run python scripts/verificar\_casos.py}; el de Lucene se verifica con la misma herramienta y la opción \texttt{--comando}, que ejecuta un programa externo por caso. El contrato completo de pasos y su orden está en \texttt{recursos/README.md}.
 
 % =========================================================
-% SECCIÓN 3: ESTRUCTURA INTERNA DEL ARCHIVO BINARIO
+% SECCIÓN 3: ESTADÍSTICAS
+% =========================================================
+\section{Estadísticas y evaluación de rendimiento de los índices}
+\label{sec:estadisticas}
+
+Las cifras de esta sección salen de scripts, no de valores escritos a mano: \texttt{scripts/estadisticas\_indices.py} lee los archivos \texttt{.idx} y genera las tablas de \texttt{tablas/} y los datos de \texttt{datos/}, que este documento incluye. Así, al reconstruir los índices solo hay que recompilar el informe. Cada índice guarda una huella de su normalización; si una política o una lista de \texttt{recursos/} cambió después de medir, el documento muestra el aviso de cifras desactualizadas.
+
+\IfFileExists{tablas/vigencia.tex}{\input{tablas/vigencia.tex}\AvisoCifras}{}
+
+Las tres configuraciones se construyeron sobre los mismos 500 primeros documentos de la colección, con el procedimiento de evaluación automatizado:
+\begin{lstlisting}[language=bash, caption={Ejecución comparativa de las tres políticas de indexación.}]
+uv run indexador benchmark --limite 500
+\end{lstlisting}
+La memoria de cada política se mide con la marca de agua alta del proceso (\texttt{VmHWM}), que se reinicia antes de cada ejecución; de lo contrario la segunda y la tercera política heredarían el pico de la primera.
+
+\subsection{Métricas de los tres índices}
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Comparativa cuantitativa de los tres índices (500 documentos).}
+  \label{tab:benchmark-indices}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrr@{}}
+    \toprule
+    \textbf{Métrica} & \textbf{Mínima} & \textbf{Intermedia} & \textbf{Agresiva} \\
+    \midrule
+    \filas{tablas/indices.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+La Tabla~\ref{tab:reducciones} muestra cuánto reduce cada política frente a la mínima.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Reducción porcentual frente a la política mínima.}
+  \label{tab:reducciones}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrrr@{}}
+    \toprule
+    \textbf{Política} & \textbf{Vocabulario} & \textbf{Postings} & \textbf{Tamaño} & \textbf{Tokens} \\
+    \midrule
+    \filas{tablas/reducciones.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+Lo que muestran las tablas:
+\begin{itemize}
+  \item \textbf{Las palabras vacías y el stemming dan casi toda la reducción.} Pasar de la política mínima a la intermedia es el salto grande en vocabulario, postings y tamaño; la agresiva solo añade una mejora pequeña por encima de eso.
+  \item \textbf{Los tokens bajan mucho más que los postings.} Las palabras vacías son muy repetidas pero ocupan pocos postings (uno por documento), así que quitarlas reduce el total de tokens más de lo que reduce el tamaño del archivo.
+  \item \textbf{El tiempo de indexación sube con la normalización.} Cada paso adicional (stemming, tesauro) cuesta tiempo por token; el índice más pequeño es el más lento de construir.
+  \item \textbf{La memoria se mantiene estable} alrededor de la misma cifra en las tres políticas, porque el particionamiento de SPIMI se decide comparando la memoria residente real contra el límite del archivo de configuración y no el número de documentos.
+\end{itemize}
+
+\subsection{Distribución de los términos}
+
+\textbf{Ley de Zipf.} La frecuencia de un término es aproximadamente inversamente proporcional a su rango~\cite{manning2008}. Se ajustó una recta a $\log f$ frente a $\log r$ en el rango \IfFileExists{tablas/zipf_rango.tex}{\input{tablas/zipf_rango.tex}\ZipfRango}{--}, que excluye la cabeza (dominada por palabras vacías) y la cola (dominada por términos únicos). \textbf{Ley de Heaps.} El vocabulario crece con el número de tokens como $V = K\,T^{\beta}$; los parámetros se ajustaron con la misma colección. La Tabla~\ref{tab:ajustes} resume ambos ajustes.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Pendiente de Zipf ($|b|$) y parámetros de Heaps ($K$, $\beta$).}
+  \label{tab:ajustes}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrr@{}}
+    \toprule
+    \textbf{Política} & \textbf{Zipf $|b|$} & \textbf{Heaps $K$} & \textbf{Heaps $\beta$} \\
+    \midrule
+    \filas{tablas/ajustes.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\IfFileExists{datos/zipf_minimo.csv}{%
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \begin{loglogaxis}[width=0.9\linewidth, height=6.2cm, xlabel={Rango}, ylabel={Frecuencia}, legend pos=north east, legend style={font=\footnotesize}, grid=major, grid style={gray!25}]
+      \addplot[blue, thick] table[col sep=comma, x=rango, y=frecuencia]{datos/zipf_minimo.csv};
+      \addplot[red!70!black, thick, dashed] table[col sep=comma, x=rango, y=frecuencia]{datos/zipf_estandar.csv};
+      \addplot[green!45!black, thick, dotted] table[col sep=comma, x=rango, y=frecuencia]{datos/zipf_avanzado.csv};
+      \legend{Mínima, Intermedia, Agresiva}
+    \end{loglogaxis}
+  \end{tikzpicture}
+  \caption{Frecuencia de los términos frente a su rango, en escala log-log.}
+  \label{fig:zipf}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[width=0.9\linewidth, height=6.2cm, xlabel={Tokens procesados}, ylabel={Vocabulario}, legend pos=north west, legend style={font=\footnotesize}, grid=major, grid style={gray!25}, scaled ticks=false, tick label style={/pgf/number format/fixed}]
+      \addplot[blue, thick] table[col sep=comma, x=tokens, y=vocabulario]{datos/heaps_minimo.csv};
+      \addplot[red!70!black, thick, dashed] table[col sep=comma, x=tokens, y=vocabulario]{datos/heaps_estandar.csv};
+      \addplot[green!45!black, thick, dotted] table[col sep=comma, x=tokens, y=vocabulario]{datos/heaps_avanzado.csv};
+      \legend{Mínima, Intermedia, Agresiva}
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Crecimiento del vocabulario con los tokens procesados (ley de Heaps).}
+  \label{fig:heaps}
+\end{figure}
+}{}
+
+\textbf{Frecuencia de documento.} La Tabla~\ref{tab:topdf} lista los diez términos que aparecen en más documentos. En la política mínima son palabras vacías; en las otras dos son palabras de contenido muy generales (\textit{film}, \textit{part}, \textit{new}), y con la agresiva aparece \texttt{<NUM>}, que condensa todos los números en un solo término.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Diez términos con mayor frecuencia de documento (entre paréntesis, $df$).}
+  \label{tab:topdf}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lP{3.4cm}P{3.4cm}P{3.4cm}@{}}
+    \toprule
+    \textbf{\#} & \textbf{Mínima} & \textbf{Intermedia} & \textbf{Agresiva} \\
+    \midrule
+    \filas{tablas/top_df.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\IfFileExists{datos/df_minimo.csv}{%
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[ybar, width=0.95\linewidth, height=6cm, bar width=4pt, xlabel={Rango de $df$}, ylabel={Términos}, symbolic x coords={1,2--2,3--5,6--10,11--50,51--100,101--250,251--500,>500}, xtick=data, x tick label style={rotate=35, anchor=east, font=\footnotesize}, ymode=log, log origin=infty, legend style={font=\footnotesize, at={(0.98,0.97)}, anchor=north east}, enlarge x limits=0.08, ymajorgrids, grid style={gray!25}]
+      \addplot[fill=blue!60] table[col sep=comma, x=rango, y=terminos]{datos/df_minimo.csv};
+      \addplot[fill=red!60] table[col sep=comma, x=rango, y=terminos]{datos/df_estandar.csv};
+      \addplot[fill=green!50!black] table[col sep=comma, x=rango, y=terminos]{datos/df_avanzado.csv};
+      \legend{Mínima, Intermedia, Agresiva}
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Número de términos según su frecuencia de documento (escala logarítmica).}
+  \label{fig:df}
+\end{figure}
+}{}
+
+Cerca de la mitad del vocabulario tiene $df=1$ (Tabla~\ref{tab:benchmark-indices}). Esos términos (erratas, nombres propios raros, identificadores) casi nunca se buscan y alargan el diccionario; una política que los eliminara tendría que decidir cuáles son ruido, algo que no se hizo.
+
+\subsection{Tamaño por sección del archivo}
+
+La Tabla~\ref{tab:secciones} desglosa el archivo binario (estructura en la sección~\ref{sec:estructura-binaria}). Las listas de postings ocupan la mayor parte, por lo que reducir postings es lo que más achica el índice.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Bytes por sección del archivo \texttt{.idx}.}
+  \label{tab:secciones}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrrrr@{}}
+    \toprule
+    \textbf{Política} & \textbf{Encabezado} & \textbf{Documentos} & \textbf{Diccionario} & \textbf{Postings} & \textbf{\% postings} \\
+    \midrule
+    \filas{tablas/secciones.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\subsection{Consultas bajo cada política}
+
+La Tabla~\ref{tab:consultas} cuenta los documentos que devuelve cada política para consultas de tipos distintos, y la Tabla~\ref{tab:consultas-tokens} muestra en qué términos se convirtió cada una.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Documentos que contienen al menos un término de la consulta.}
+  \label{tab:consultas}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrr@{}}
+    \toprule
+    \textbf{Consulta} & \textbf{Mínima} & \textbf{Intermedia} & \textbf{Agresiva} \\
+    \midrule
+    \filas{tablas/consultas.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Términos en que se convierte cada consulta.}
+  \label{tab:consultas-tokens}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lP{3.3cm}P{3.3cm}P{3.3cm}@{}}
+    \toprule
+    \textbf{Consulta} & \textbf{Mínima} & \textbf{Intermedia} & \textbf{Agresiva} \\
+    \midrule
+    \filas{tablas/consultas_tokens.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+Estas cifras cuentan documentos que contienen \emph{algún} término de la consulta, no resultados relevantes: miden cobertura, no precisión, y no hay juicios de relevancia con los que medir esta última. Aun así se ven efectos claros. Con la agresiva, \textit{película} y \textit{movie} se unifican en \texttt{film} y devuelven el mismo conjunto en ambos idiomas; \textit{director} y \textit{cineasta} también convergen. En cambio \textit{Star Wars} devuelve muchos más documentos con la intermedia que con la mínima porque el stemmer une \textit{star} y \textit{stars}, y la consulta de un año (\textit{1994}) se vuelve \texttt{<ANIO\_1994>} y conserva su cobertura exacta.
+
+\subsection{Comparación entre el indexador propio y el de Lucene}
+
+El script \texttt{scripts/benchmark\_comparativo.py} ejecuta ambos indexadores como procesos externos con las mismas tres configuraciones y la misma muestra, y mide cada uno con \texttt{RUSAGE\_CHILDREN} desde un proceso intermedio. Así Python y la JVM se miden de la misma manera: tiempo de pared, tiempo de CPU, memoria residente máxima, tamaño del índice, términos y postings.
+
+\IfFileExists{tablas/comparativo.tex}{%
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Indexador propio frente a Lucene.}
+  \label{tab:comparativo}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llrrrrrr@{}}
+    \toprule
+    \textbf{Impl.} & \textbf{Política} & \textbf{Pared (s)} & \textbf{CPU (s)} & \textbf{RAM (MB)} & \textbf{Tam. (MB)} & \textbf{Términos} & \textbf{Postings} \\
+    \midrule
+    \filas{tablas/comparativo.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+}{%
+\noindent\fbox{\parbox{0.94\linewidth}{\small \textbf{Pendiente.} La comparación con Lucene aún no tiene cifras: falta el indexador de Lucene. Cuando exista, se mide con \texttt{scripts/regenerar\_todo.sh} definiendo la variable \texttt{LUCENE\_CMD}, y esta tabla aparece sola.}}
+}
+
+\subsection{Escala de la colección}
+
+Una prueba de escalado sobre veinte mil documentos de la misma colección confirmó que el esquema se sostiene fuera de la muestra: el índice se construyó en $160{,}8$ segundos con $539\,511$ términos y $13\,637\,739$ ocurrencias, un archivo de $172{,}6$ MB y un pico de $552$ MB de memoria residente, lo que proyecta alrededor de una hora y $3{,}7$ GB para los $317\,657$ documentos de la colección ($5{,}10$ GiB de texto). Esa medición motiva que el límite de memoria de SPIMI se evalúe contra el consumo real del proceso y no contra un número fijo de documentos.
+
+
+% =========================================================
+% SECCIÓN 4: ESTRUCTURA INTERNA DEL ARCHIVO BINARIO
 % =========================================================
 \section{Descripción de la estructura interna del archivo del índice}
 \label{sec:estructura-binaria}
@@ -483,13 +729,13 @@ Los primeros sesenta y cuatro bytes del archivo corresponden a los metadatos glo
     \midrule
     \texttt{0x00 - 0x07} & \texttt{char[8]} & 8 & Firma mágica de identificación: \texttt{ENCUADRE} \\
     \texttt{0x08 - 0x09} & \texttt{uint16}  & 2 & Versión del esquema binario: 1 \\
-    \texttt{0x0A - 0x0B} & \texttt{uint16}  & 2 & Banderas de normalización: 0x000F con minúsculas, puntuación, palabras vacías y lematización activadas \\
+    \texttt{0x0A - 0x0B} & \texttt{uint16}  & 2 & Banderas de normalización: 0x000F con minúsculas, puntuación, palabras vacías y stemming Snowball activados \\
     \texttt{0x0C - 0x0F} & \texttt{uint32}  & 4 & Total de documentos $N$: 500 \\
     \texttt{0x10 - 0x13} & \texttt{uint32}  & 4 & Tamaño del vocabulario $|V|$: $61\,068$ términos \\
     \texttt{0x14 - 0x1B} & \texttt{uint64}  & 8 & Total de ocurrencias acumuladas: $486\,847$ postings \\
     \texttt{0x1C - 0x23} & \texttt{uint64}  & 8 & Desplazamiento a la tabla de documentos: byte 64, equivalente a 0x40 \\
     \texttt{0x24 - 0x2B} & \texttt{uint64}  & 8 & Desplazamiento a la sección del diccionario: byte $22\,064$, equivalente a 0x5630 \\
-    \texttt{0x2C - 0x33} & \texttt{uint64}  & 8 & Desplazamiento a la sección de postings: byte $1\,735\,347$, equivalente a 0x1A7AB3 \\
+    \texttt{0x2C - 0x33} & \texttt{uint64}  & 8 & Desplazamiento a la sección de postings: byte $1\,789\,905$, equivalente a 0x1B4FD1 \\
     \texttt{0x34 - 0x3F} & \texttt{byte[12]} & 12 & Modelo de ponderación: byte 0 con el esquema $tf$, byte 1 con el esquema $idf$ y byte 2 con banderas de coseno e IDF suavizado; los nueve bytes restantes quedan en cero \\
     \bottomrule
   \end{tabularx}
@@ -535,11 +781,11 @@ En la dirección \texttt{0x00005630}, obtenida al sumar el bloque de cabecera y 
 \end{itemize}
 
 \begin{lstlisting}[language=bash, caption={Volcado del diccionario de términos mediante \texttt{hexdump}.}]
-00005630  01 00 30 01 00 00 00 70  ee c6 40 b3 7a 1a 00 00  |..0....p..@.z...|
+00005630  01 00 30 01 00 00 00 70  ee c6 40 d1 4f 1b 00 00  |..0....p..@.O...|
 00005640  00 00 00 0c 00 00 00 03  00 30 2d 30 01 00 00 00  |.........0-0....|
-00005650  70 ee c6 40 bf 7a 1a 00  00 00 00 00 0c 00 00 00  |p..@.z..........|
+00005650  70 ee c6 40 dd 4f 1b 00  00 00 00 00 0c 00 00 00  |p..@.O..........|
 00005660  0d 00 30 2d 31 32 2d 34  39 30 36 33 30 2d 33 01  |..0-12-490630-3.|
-00005670  00 00 00 70 ee c6 40 cb  7a 1a 00 00 00 00 00 0c  |...p..@.z.......|
+00005670  00 00 00 70 ee c6 40 e9  4f 1b 00 00 00 00 00 0c  |...p..@.O.......|
 \end{lstlisting}
 
 Al contrastar las entradas consecutivas capturadas en el volcado anterior, se comprueba la serialización individual de cada término:
@@ -593,5 +839,24 @@ Complementariamente a la lectura directa de bytes mediante \texttt{hexdump}, el 
 \begin{lstlisting}[language=bash, caption={Inspección de estructuras y términos en el archivo binario.}]
 uv run indexador inspeccionar salida/indice_estandar.idx --termino "film"
 \end{lstlisting}
+
+
+% =========================================================
+% REFERENCIAS
+% =========================================================
+\begin{thebibliography}{99}
+\setlength{\itemsep}{4pt}
+\bibitem{manning2008} C.~D. Manning, P.~Raghavan y H.~Schütze, \textit{Introduction to Information Retrieval}. Cambridge University Press, 2008. Secciones 2.2 (normalización y stemming), 5.1 (leyes de Heaps y Zipf) y 6.2 (ponderación). \url{https://nlp.stanford.edu/IR-book/}
+\bibitem{porter1980} M.~F. Porter, ``An algorithm for suffix stripping'', \textit{Program}, vol.~14, n.º~3, pp.~130--137, 1980.
+\bibitem{porter2001} M.~F. Porter, ``Snowball: A language for stemming algorithms'', octubre de 2001. \url{https://snowballstem.org/texts/introduction.html}
+\bibitem{harman1991} D.~Harman, ``How effective is suffixing?'', \textit{Journal of the American Society for Information Science}, vol.~42, n.º~1, pp.~7--15, 1991. \url{https://doi.org/10.1002/(SICI)1097-4571(199101)42:1<7::AID-ASI2>3.0.CO;2-P}
+\bibitem{voorhees1994} E.~M. Voorhees, ``Query expansion using lexical-semantic relations'', en \textit{Proc.\ 17th ACM SIGIR}, Dublín, pp.~61--69, 1994.
+\bibitem{salton1988} G.~Salton y C.~Buckley, ``Term-weighting approaches in automatic text retrieval'', \textit{Information Processing \& Management}, vol.~24, n.º~5, pp.~513--523, 1988. \url{https://doi.org/10.1016/0306-4573(88)90021-0}
+\bibitem{unicode15} Unicode Consortium, ``Unicode Standard Annex \#15: Unicode Normalization Forms''. \url{https://unicode.org/reports/tr15/}
+\bibitem{iso25964} ISO, \textit{ISO 25964-1:2011, Information and documentation -- Thesauri and interoperability with other vocabularies -- Part 1: Thesauri for information retrieval}, 2011. \url{https://www.iso.org/standard/53657.html}
+\bibitem{nadeau2007} D.~Nadeau y S.~Sekine, ``A survey of named entity recognition and classification'', \textit{Lingvisticae Investigationes}, vol.~30, n.º~1, pp.~3--26, 2007. \url{https://doi.org/10.1075/li.30.1.03nad}
+\bibitem{lucene-wordlist} Apache Lucene, documentación de la clase \texttt{WordlistLoader}. \url{https://lucene.apache.org/core/9_10_0/core/org/apache/lucene/analysis/WordlistLoader.html}
+\bibitem{lucene-solrsyn} Apache Lucene, documentación de la clase \texttt{SolrSynonymParser}. \url{https://lucene.apache.org/core/8_1_0/analyzers-common/org/apache/lucene/analysis/synonym/SolrSynonymParser.html}
+\end{thebibliography}
 
 \end{document}

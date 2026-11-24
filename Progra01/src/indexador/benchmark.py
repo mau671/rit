@@ -10,10 +10,15 @@ Mide:
 
 from __future__ import annotations
 
+import hashlib
+import os
+import platform
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
+from . import normalizador as _normalizador
 from .configuracion import ConfiguracionIndexador
 from .memoria import memoria_pico_mb
 from .memoria import reiniciar_memoria_pico as _reiniciar_memoria_pico
@@ -37,6 +42,31 @@ class MetricasIndice:
     memoria_pico_mb: float
     postings_por_termino_promedio: float
     bytes_por_documento_promedio: float
+    # Procedencia de la medición: permite detectar números viejos en el informe.
+    fecha: str = ""
+    limite_documentos: int = 0
+    huella_normalizacion: str = ""
+    maquina: str = ""
+
+
+def huella_normalizacion(config: ConfiguracionIndexador) -> str:
+    """Huella de todo lo que decide qué tokens produce una política.
+
+    Mezcla los archivos de ``recursos/``, el código del normalizador y los
+    parámetros de la política. Si cambia cualquiera, un índice construido antes
+    ya no corresponde a lo que describe el informe.
+    """
+    h = hashlib.sha256()
+    for ruta in sorted(_normalizador.DIRECTORIO_RECURSOS.glob("*.txt")):
+        h.update(ruta.name.encode() + ruta.read_bytes())
+    h.update(Path(_normalizador.__file__).read_bytes())
+    h.update(repr(config.normalizacion).encode())
+    return h.hexdigest()[:12]
+
+
+def descripcion_maquina() -> str:
+    """Una línea con el equipo donde se midió (los tiempos no son comparables sin ella)."""
+    return f"{platform.system()} {platform.machine()}, {os.cpu_count()} CPU, Python {platform.python_version()}"
 
 
 def obtener_memoria_pico_mb() -> float:
@@ -113,6 +143,10 @@ def ejecutar_benchmark_politica(
         memoria_pico_mb=round(memoria_mb, 2),
         postings_por_termino_promedio=round(postings_prom, 2),
         bytes_por_documento_promedio=round(bytes_doc_prom, 2),
+        fecha=datetime.now().astimezone().isoformat(timespec="seconds"),
+        limite_documentos=limite_documentos,
+        huella_normalizacion=huella_normalizacion(config),
+        maquina=descripcion_maquina(),
     )
 
 

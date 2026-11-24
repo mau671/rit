@@ -351,11 +351,12 @@ class ConfiguracionIndexador:
         if politica_norm == "avanzado":
             return cls(
                 nombre_politica="avanzado",
-                descripcion="Política 3: Normalización completa con stopwords, stemming, números, fechas y tesauro de sinónimos",
+                descripcion="Política 3: Normalización agresiva con plegado de tildes, stopwords, stemming, números, fechas, sinónimos y tesauro",
                 normalizacion=ConfiguracionNormalizacion(
                     idioma="auto",
                     minusculas=True,
                     eliminar_puntuacion=True,
+                    remover_acentos=True,
                     stopwords=True,
                     idiomas_stopwords=["es", "en"],
                     stemming=True,

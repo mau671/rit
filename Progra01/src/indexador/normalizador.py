@@ -5,19 +5,20 @@ Implementa:
 - Detección de patrones temporales (fechas dd/mm/aaaa, yyyy-mm-dd, años cinematográficos 1888-2099).
 - Tokenización robusta basada en expresiones regulares tolerante a tildes, diacríticos y guiones.
 - Normalización y preservación/descarte semántico de números y fechas.
-- Lista completa y rigurosa de stopwords en español e inglés (artículos, preposiciones, pronombres, etc.).
+- Stopwords, sinónimos y tesauro leídos de ``recursos/`` (los mismos archivos que usa el indexador Lucene).
 - Stemming multilingüe usando `snowballstemmer` ('spanish' y 'english'), con detección
   automática de idioma por proporción de stopwords o selección manual por configuración.
-- Tesauro y diccionario de equivalencias cinematográficas y audiovisuales (ej. 'film' -> 'pelicula',
-  'screenplay' -> 'guion', 'director' -> 'realizador', 'movie' -> 'film', etc.).
+- Contracciones del inglés ('it's', "don't") reducidas antes de filtrar stopwords.
 - Clase `Normalizador` modular y de alto rendimiento que encadena los pasos según la configuración.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 from collections.abc import Iterator, Sequence
+from pathlib import Path
 from typing import Final
 
 import snowballstemmer
@@ -25,210 +26,58 @@ import snowballstemmer
 from .configuracion import ConfiguracionNormalizacion
 
 # ==============================================================================
-# STOPWORDS EN ESPAÑOL E INGLÉS
+# RECURSOS COMPARTIDOS (stopwords, sinónimos, tesauro)
 # ==============================================================================
-
-STOPWORDS_ESPANOL: Final[frozenset[str]] = frozenset({
-    # Artículos
-    "el", "la", "los", "las", "un", "una", "unos", "unas", "lo", "al", "del",
-    # Preposiciones
-    "a", "ante", "bajo", "cabe", "con", "contra", "de", "desde", "durante",
-    "en", "entre", "hacia", "hasta", "mediante", "para", "por", "segun", "según",
-    "sin", "so", "sobre", "tras", "versus", "via", "vía",
-    # Conjunciones
-    "y", "e", "ni", "o", "u", "pero", "mas", "sino", "aunque", "porque", "pues",
-    "que", "si", "siquiera", "ya", "como", "cuando", "donde", "mientras",
-    # Pronombres y posesivos
-    "yo", "tu", "tú", "él", "ella", "ellos", "ellas", "nosotros", "nosotras",
-    "vosotros", "vosotras", "usted", "ustedes", "me", "te", "se", "nos", "os",
-    "le", "les", "mi", "mí", "mis", "tus", "su", "sus", "nuestro", "nuestra",
-    "nuestros", "nuestras", "vuestro", "vuestra", "vuestros", "vuestras", "suyo", "suya",
-    "suyos", "suyas", "mio", "mío", "mia", "mía", "mios", "míos", "mias", "mías",
-    # Demostrativos
-    "este", "esta", "estos", "estas", "esto", "ese", "esa", "esos", "esas", "eso",
-    "aquel", "aquella", "aquellos", "aquellas", "aquello",
-    # Verbos auxiliares y muy frecuentes (ser, estar, haber, tener)
-    "es", "son", "era", "eran", "fue", "fueron", "ser", "sido", "siendo", "sea", "sean",
-    "está", "estan", "están", "estaba", "estaban", "estuvo", "estuvieron",
-    "estar", "estado", "estando", "esté", "esten", "estén",
-    "ha", "han", "hay", "habia", "había", "habian", "habían", "hubo", "haber", "habido",
-    "habiendo", "haya", "hayan",
-    "tiene", "tienen", "tenia", "tenía", "tenian", "tenían", "tuvo", "tuvieron", "tener",
-    "tenido", "teniendo", "tenga", "tengan",
-    # Adverbios y otros frecuentes
-    "no", "sí", "muy", "más", "menos", "tan", "tanto", "tanta", "tantos",
-    "tantas", "mucho", "mucha", "muchos", "muchas", "poco", "poca", "pocos", "pocas",
-    "todo", "toda", "todos", "todas", "otro", "otra", "otros", "otras", "mismo", "misma",
-    "mismos", "mismas", "algo", "nada", "alguien", "nadie", "cual", "cuál", "cuales",
-    "cuáles", "quien", "quién", "quienes", "quiénes", "cuyo", "cuya", "cuyos", "cuyas",
-    "tambien", "también", "tampoco", "solo", "sólo", "solamente", "ahora", "despues",
-    "después", "antes", "bien", "asi", "así", "cada",
-})
-
-STOPWORDS_INGLES: Final[frozenset[str]] = frozenset({
-    # Articles
-    "a", "an", "the",
-    # Prepositions
-    "about", "above", "across", "after", "against", "along", "among", "around", "at",
-    "before", "behind", "below", "beneath", "beside", "between", "beyond", "by",
-    "down", "during", "except", "for", "from", "in", "inside", "into", "near", "of",
-    "off", "on", "onto", "out", "outside", "over", "past", "through", "throughout",
-    "to", "toward", "towards", "under", "underneath", "until", "up", "upon", "with",
-    "within", "without",
-    # Conjunctions
-    "and", "but", "or", "nor", "yet", "so", "although", "because", "since",
-    "unless", "while", "where", "whereas", "whether", "if", "that", "than",
-    # Pronouns & Possessives
-    "i", "me", "my", "myself", "we", "us", "our", "ours", "ourselves", "you", "your",
-    "yours", "yourself", "yourselves", "he", "him", "his", "himself", "she", "her",
-    "hers", "herself", "it", "its", "itself", "they", "them", "their", "theirs",
-    "themselves", "what", "which", "who", "whom", "this", "these", "those",
-    # Auxiliary verbs & forms of to be, to have, to do
-    "am", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "having",
-    "do", "does", "did", "doing", "done",
-    "would", "should", "could", "ought", "may", "might", "must", "can", "shall", "will",
-    # Contractions stems/fragments
-    "re", "ve", "ll", "d", "m", "t", "s", "don", "didn", "doesn", "hadn", "hasn", "haven",
-    "isn", "wasn", "weren", "won", "wouldn", "couldn", "shouldn",
-    # Adverbs & common fillers
-    "not", "no", "yes", "very", "too", "quite", "more", "most", "less", "least",
-    "only", "own", "same", "then", "there", "here", "when", "why", "how",
-    "all", "any", "both", "each", "few", "other", "some", "such", "again",
-    "further", "once", "now", "just", "also", "even",
-})
+# Viven en ``recursos/`` (raíz del proyecto) y no en el código para que el indexador
+# Lucene cargue exactamente las mismas listas. ``INDEXADOR_RECURSOS`` permite
+# apuntar a otro directorio.
+DIRECTORIO_RECURSOS: Final[Path] = Path(
+    os.environ.get("INDEXADOR_RECURSOS") or Path(__file__).resolve().parents[2] / "recursos"
+)
 
 
-# ==============================================================================
-# TESAURO / SINÓNIMOS AUDIOVISUALES
-# ==============================================================================
-# Mapea términos del dominio del cine, televisión y guiones hacia un lema o
-# concepto canónico, permitiendo que consultas como "movie" o "film" coincidan,
-# o "screenplay" y "guion" converjan al mismo concepto semántico.
-TESAURO_AUDIOVISUAL: Final[dict[str, str]] = {
-    # Cine / Película
-    "pelicula": "film",
-    "peliculas": "film",
-    "película": "film",
-    "películas": "film",
-    "movie": "film",
-    "movies": "film",
-    "cinema": "film",
-    "cinematografo": "film",
-    "cinematógrafo": "film",
-    "cinematografia": "film",
-    "cinematografía": "film",
-    "cinematografico": "film",
-    "cinematográfico": "film",
-    "motion picture": "film",
-    "motion_picture": "film",
-    "motion-picture": "film",
-    "cine": "film",
-    "filme": "film",
-    "filmes": "film",
-    "feature": "film",
+def _lineas_utiles(nombre: str) -> Iterator[str]:
+    """Líneas de un recurso sin comentarios (#) ni líneas vacías."""
+    ruta = DIRECTORIO_RECURSOS / nombre
+    if not ruta.is_file():
+        raise FileNotFoundError(
+            f"Recurso de normalización no encontrado: {ruta} "
+            "(defina INDEXADOR_RECURSOS si el proyecto no se ejecuta desde su carpeta)"
+        )
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        linea = linea.strip()
+        if linea and not linea.startswith("#"):
+            yield linea
 
-    # Dirección / Realización
-    "director": "realizador",
-    "directores": "realizador",
-    "directora": "realizador",
-    "directoras": "realizador",
-    "directing": "realizador",
-    "filmmaker": "realizador",
-    "filmmakers": "realizador",
-    "cineasta": "realizador",
-    "cineastas": "realizador",
 
-    # Guion / Libreto / Screenplay
-    "guion": "screenplay",
-    "guiones": "screenplay",
-    "guión": "screenplay",
-    "guiónes": "screenplay",
-    "guionista": "screenwriter",
-    "guionistas": "screenwriter",
-    "script": "screenplay",
-    "scripts": "screenplay",
-    "scriptwriter": "screenwriter",
-    "screenwriter": "screenwriter",
-    "screenwriters": "screenwriter",
-    "screenwriting": "screenplay",
-    "libreto": "screenplay",
-    "libretos": "screenplay",
-    "libretista": "screenwriter",
+def cargar_lista_palabras(nombre: str) -> frozenset[str]:
+    """Lee una lista de una palabra por línea (formato de ``WordlistLoader`` de Lucene)."""
+    return frozenset(_lineas_utiles(nombre))
 
-    # Actuación / Reparto / Cast
-    "actor": "interprete",
-    "actores": "interprete",
-    "actriz": "interprete",
-    "actrices": "interprete",
-    "actuacion": "interprete",
-    "actuación": "interprete",
-    "reparto": "cast",
-    "elenco": "cast",
-    "cast": "cast",
-    "casting": "cast",
-    "interprete": "interprete",
-    "intérprete": "interprete",
-    "interpretes": "interprete",
-    "intérpretes": "interprete",
-    "protagonista": "interprete",
-    "protagonistas": "interprete",
-    "star": "interprete",
-    "stars": "interprete",
-    "starring": "interprete",
 
-    # Producción
-    "productor": "producer",
-    "productores": "producer",
-    "productora": "producer",
-    "productoras": "producer",
-    "produccion": "producer",
-    "producción": "producer",
-    "producer": "producer",
-    "producers": "producer",
-    "producing": "producer",
+def cargar_sinonimos(*nombres: str) -> dict[str, str]:
+    """Lee reglas ``a, b, c => canon`` (formato Solr) y devuelve ``{variante: canon}``.
 
-    # Formatos y Géneros frecuentes
-    "largometraje": "largometraje",
-    "largometrajes": "largometraje",
-    "cortometraje": "cortometraje",
-    "cortometrajes": "cortometraje",
-    "short": "cortometraje",
-    "shorts": "cortometraje",
-    "short film": "cortometraje",
-    "documental": "documental",
-    "documentales": "documental",
-    "documentary": "documental",
-    "documentaries": "documental",
-    "animacion": "animacion",
-    "animación": "animacion",
-    "animation": "animacion",
-    "animated": "animacion",
-    "thriller": "suspenso",
-    "suspense": "suspenso",
-    "suspenso": "suspenso",
+    Si una variante aparece en dos reglas gana la última, igual que al fusionar
+    los archivos en el mismo orden dentro de un ``SynonymMap`` de Lucene.
+    """
+    mapa: dict[str, str] = {}
+    for nombre in nombres:
+        for linea in _lineas_utiles(nombre):
+            izquierda, separador, canon = linea.partition("=>")
+            if not separador:
+                raise ValueError(f"{nombre}: regla sin '=>': {linea!r}")
+            for variante in izquierda.split(","):
+                if variante.strip():
+                    mapa[variante.strip().lower()] = canon.strip().lower()
+    return mapa
 
-    # Banda Sonora / Música
-    "soundtrack": "banda_sonora",
-    "soundtracks": "banda_sonora",
-    "ost": "banda_sonora",
-    "score": "banda_sonora",
-    "musica": "banda_sonora",
-    "música": "banda_sonora",
-    "compositor": "banda_sonora",
-    "composer": "banda_sonora",
 
-    # Fotografía y Montaje
-    "fotografia": "fotografia",
-    "fotografía": "fotografia",
-    "cinematography": "fotografia",
-    "cameraman": "fotografia",
-    "montaje": "edicion",
-    "edicion": "edicion",
-    "edición": "edicion",
-    "editing": "edicion",
-    "editor": "edicion",
-}
+STOPWORDS_ESPANOL: Final[frozenset[str]] = cargar_lista_palabras("stopwords_es.txt")
+STOPWORDS_INGLES: Final[frozenset[str]] = cargar_lista_palabras("stopwords_en.txt")
+
+# Sinónimos de obras/formatos/técnica y tesauro de oficios, fusionados en un solo mapa.
+TESAURO_AUDIOVISUAL: Final[dict[str, str]] = cargar_sinonimos("sinonimos.txt", "tesauro.txt")
 
 
 # ==============================================================================
@@ -236,9 +85,21 @@ TESAURO_AUDIOVISUAL: Final[dict[str, str]] = {
 # ==============================================================================
 
 # Detección de fechas numéricas:
-# Formatos: dd/mm/aaaa, dd-mm-aaaa, aaaa-mm-dd, dd.mm.aaaa
+# Formatos: dd/mm/aaaa, dd-mm-aaaa, aaaa-mm-dd (también con "/")
 RE_FECHA_COMPLETA = re.compile(
     r"\b(?:\d{1,2}[/-]\d{1,2}[/-](?:18|19|20)\d{2}|(?:18|19|20)\d{2}[/-]\d{1,2}[/-]\d{1,2})\b"
+)
+
+# Fechas escritas con el mes en letras: "25 de diciembre de 1977", "December 25, 1977",
+# "25th of December 1977". Solo fechas completas (día + mes + año): "mayo de 1999" es
+# una fecha parcial y se deja como texto.
+_MESES_ES = "enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre"
+_MESES_EN = "january|february|march|april|may|june|july|august|september|october|november|december"
+RE_FECHA_TEXTUAL = re.compile(
+    rf"\b\d{{1,2}}\s+de\s+(?:{_MESES_ES})\s+de(?:l)?\s+(?:18|19|20)\d{{2}}\b"
+    rf"|\b(?:{_MESES_EN})\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s+(?:18|19|20)\d{{2}}\b"
+    rf"|\b\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:{_MESES_EN}),?\s+(?:18|19|20)\d{{2}}\b",
+    re.IGNORECASE,
 )
 
 # Detección de años cinematográficos (1888 - primer filme de la historia - hasta 2099)
@@ -255,13 +116,25 @@ RE_NUMERO_GENERAL = re.compile(r"\b\d+(?:[.,]\d+)?\b")
 RE_TOKEN = re.compile(r"<[A-Z0-9_]+>|[^\W_]+(?:[-'_][^\W_]+)*", re.UNICODE)
 
 
+# Clíticos del inglés que el tokenizador deja pegados al token ("it's", "I'm", "O'Brien's").
+# Se quitan antes de filtrar stopwords; si no, "it's" no coincide con "it" y se cuela al índice.
+RE_CLITICO_EN = re.compile(r"'(?:s|re|ve|ll|d|m)$")
+
+
 def remover_diacriticos(texto: str) -> str:
-    """Elimina tildes y diacríticos preservando los caracteres base (ej. 'película' -> 'pelicula').
-    
-    Nota: La 'ñ' se preserva como 'n' o se puede conservar según se requiera. NFKD + decomposición.
+    """Elimina tildes y diéresis dejando la letra base (ej. 'película' -> 'pelicula').
+
+    La eñe se conserva: 'año' y 'ano' son palabras distintas en español.
     """
-    nfkd = unicodedata.normalize("NFKD", texto)
-    return "".join(c for c in nfkd if not unicodedata.combining(c))
+    resultado: list[str] = []
+    for c in unicodedata.normalize("NFKD", texto):
+        if unicodedata.combining(c):
+            # la marca U+0303 solo se queda si cuelga de una n (ñ/Ñ)
+            if c == "\u0303" and resultado and resultado[-1] in "nN":
+                resultado.append(c)
+            continue
+        resultado.append(c)
+    return unicodedata.normalize("NFC", "".join(resultado))
 
 
 def limpiar_texto_crudo(texto: str) -> str:
@@ -377,9 +250,10 @@ class Normalizador:
         """Reemplaza patrones de fechas y números por marcadores semánticos según la configuración."""
         t = texto
 
-        # 1. Normalizar fechas completas (ej. 25/12/1977 -> <FECHA>)
+        # 1. Normalizar fechas completas (ej. 25/12/1977 o 25 de diciembre de 1977 -> <FECHA>)
         if self.config.normalizar_fechas:
             t = RE_FECHA_COMPLETA.sub(" <FECHA> ", t)
+            t = RE_FECHA_TEXTUAL.sub(" <FECHA> ", t)
             # Años de cine aislados (ej. 1994, 2024 -> <ANIO_1994>)
             t = RE_ANIO_CINE.sub(r" <ANIO_\1> ", t)
 
@@ -422,6 +296,12 @@ class Normalizador:
             tokens_brutos = [
                 t if (t.startswith("<") and t.endswith(">")) else remover_diacriticos(t)
                 for t in tokens_brutos
+            ]
+
+        # Paso 4b: Clíticos del inglés ('it's' -> 'it'), solo si se filtran stopwords
+        if self.config.stopwords:
+            tokens_brutos = [
+                t if t.startswith("<") else RE_CLITICO_EN.sub("", t) for t in tokens_brutos
             ]
 
         # Paso 5: Detección heurística de idioma para stemming

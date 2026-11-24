@@ -96,7 +96,7 @@ Tres políticas de normalización configurables en `Progra01/configuraciones/`:
 |---|---|
 | `minimo.conf` | Minúsculas y puntuación, sin stopwords ni stemming |
 | `estandar.conf` | Stopwords ES+EN y stemming Snowball |
-| `avanzado.conf` | Además números, fechas y expansión por sinónimos |
+| `avanzado.conf` | Además plegado de tildes, números, fechas y expansión por sinónimos |
 
 ```bash
 cd Progra01
@@ -139,9 +139,9 @@ cd Progra00/propio && uv run pytest
 ## Datos y artefactos
 
 Los corpus descargados, bases de datos, bitácoras, resultados e índices **no se
-versionan**; las reglas comunes están en `.gitignore`. El `Progra00.tar.gz` de
+versionan**; las reglas comunes están en `.gitignore`. El `Progra00.zip` de
 la raíz es el paquete de entrega del componente de almacenamiento.
 
 ## Autores
 
-Mauricio González Prendas — curso IC-8060, Tecnológico de Costa Rica.
+Santiago Espinoza Rendón, Fabián Araya Ortega y Mauricio González Prendas — curso IC-8060, Tecnológico de Costa Rica.

@@ -1,0 +1,29 @@
+# Tesauro de oficios y créditos audiovisuales — recurso compartido por el indexador propio y el de Lucene.
+#
+# Es un vocabulario controlado en el sentido de ISO 25964-1: cada línea declara un descriptor
+# (lado derecho) y los términos no preferidos que remiten a él (lado izquierdo, relación UF/USE).
+# Mismo formato que sinonimos.txt ("t1, t2 => descriptor") para que un solo analizador
+# (SolrSynonymParser en Lucene) cargue ambos archivos.
+#
+# Diferencia con sinonimos.txt: aquí se agrupan oficios, roles y créditos de una producción, donde los
+# términos no son estrictamente sinónimos (director/cineasta/filmmaker) pero el colectivo los usa de
+# forma intercambiable al buscar. Las relaciones jerárquicas (BT/NT) no se indexan: expandirlas
+# multiplicaría los postings y no se justificó con el corpus.
+#
+# Excluidos por ambiguos: protagonista (es un personaje, no un oficio), star/stars (Star Wars,
+# Star Trek), produccion/producing (empresa o proceso, no persona), compositor/composer, cameraman.
+
+# Dirección
+director, directores, directora, directoras, directing, filmmaker, filmmakers, cineasta, cineastas => realizador
+
+# Guion
+guionista, guionistas, scriptwriter, screenwriter, screenwriters, libretista => screenwriter
+
+# Actuación
+actor, actores, actriz, actrices, actuacion, actuación, interprete, intérprete, interpretes, intérpretes, starring => interprete
+
+# Reparto
+reparto, elenco, cast, casting => cast
+
+# Producción
+productor, productores, productora, productoras, producer, producers => producer

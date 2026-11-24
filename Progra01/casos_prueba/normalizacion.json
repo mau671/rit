@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "descripcion": "Casos texto -> tokens esperados que TODO indexador (propio y Lucene) debe cumplir. Cada caso trae los tokens de las tres politicas. El contrato del pipeline esta en recursos/README.md.",
+  "politicas": ["minimo", "estandar", "avanzado"],
+  "casos": [
+    {"id": "puntuacion-es", "grupo": "tokenizacion", "texto": "Hola, mundo: ¡adiós! (otra vez)…",
+     "tokens": {
+       "minimo": ["hola", "mundo", "adiós", "otra", "vez"],
+       "estandar": ["hol", "mund", "adios", "vez"],
+       "avanzado": ["hol", "mund", "adi", "vez"]
+     }},
+    {"id": "guion-y-apostrofe-en", "grupo": "tokenizacion", "texto": "The Spider-Man and O'Brien's sci-fi show",
+     "tokens": {
+       "minimo": ["the", "spider-man", "and", "o'brien's", "sci-fi", "show"],
+       "estandar": ["spider-man", "o'brien", "sci-fi", "show"],
+       "avanzado": ["spider-man", "o'brien", "sci-fi", "show"]
+     }},
+    {"id": "unicode-nfkc", "grupo": "tokenizacion", "texto": "ﬁlmography: “quoted” ‘single’ — dash",
+     "tokens": {
+       "minimo": ["filmography", "quoted", "single", "dash"],
+       "estandar": ["filmography", "quot", "singl", "dash"],
+       "avanzado": ["filmography", "quot", "singl", "dash"]
+     }},
+    {"id": "mayusculas-y-tildes", "grupo": "tokenizacion", "texto": "PELÍCULA Película película",
+     "tokens": {
+       "minimo": ["película", "película", "película"],
+       "estandar": ["pelicul", "pelicul", "pelicul"],
+       "avanzado": ["film", "film", "film"]
+     }},
+    {"id": "longitud-minima-maxima", "grupo": "tokenizacion", "texto": "a x yo bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ccccccccccccccccccccccccccccccccccccccccccccccccccc",
+     "tokens": {
+       "minimo": ["yo", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+       "estandar": ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"],
+       "avanzado": ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]
+     }},
+    {"id": "enie-se-conserva", "grupo": "diacriticos", "texto": "El niño del año pequeño",
+     "tokens": {
+       "minimo": ["el", "niño", "del", "año", "pequeño"],
+       "estandar": ["niñ", "año", "pequeñ"],
+       "avanzado": ["niñ", "año", "pequeñ"]
+     }},
+    {"id": "nombres-con-tilde", "grupo": "diacriticos", "texto": "Amélie y Pokémon son películas",
+     "tokens": {
+       "minimo": ["amélie", "pokémon", "son", "películas"],
+       "estandar": ["ameli", "pokemon", "pelicul"],
+       "avanzado": ["ameli", "pokemon", "film"]
+     }},
+    {"id": "stopwords-es", "grupo": "stopwords", "texto": "Los actores de la película y el guion del director",
+     "tokens": {
+       "minimo": ["los", "actores", "de", "la", "película", "el", "guion", "del", "director"],
+       "estandar": ["actor", "pelicul", "guion", "director"],
+       "avanzado": ["interpret", "film", "screenplay", "realiz"]
+     }},
+    {"id": "stopwords-en", "grupo": "stopwords", "texto": "The cast of the movie and the script by the director",
+     "tokens": {
+       "minimo": ["the", "cast", "of", "the", "movie", "and", "the", "script", "by", "the", "director"],
+       "estandar": ["cast", "movi", "script", "director"],
+       "avanzado": ["cast", "film", "screenplay", "realiz"]
+     }},
+    {"id": "contracciones-en", "grupo": "stopwords", "texto": "It's what I'm saying: don't you think that's Conan O'Brien's show?",
+     "tokens": {
+       "minimo": ["it's", "what", "i'm", "saying", "don't", "you", "think", "that's", "conan", "o'brien's", "show"],
+       "estandar": ["say", "think", "conan", "o'brien", "show"],
+       "avanzado": ["say", "think", "conan", "o'brien", "show"]
+     }},
+    {"id": "interrogativos-es", "grupo": "stopwords", "texto": "¿Cómo estás? ¿Dónde está el cine?",
+     "tokens": {
+       "minimo": ["cómo", "estás", "dónde", "está", "el", "cine"],
+       "estandar": ["cin"],
+       "avanzado": ["film"]
+     }},
+    {"id": "plural-genero-es", "grupo": "stemming", "texto": "violento violenta violentos violentas violencia",
+     "tokens": {
+       "minimo": ["violento", "violenta", "violentos", "violentas", "violencia"],
+       "estandar": ["violent", "violent", "violent", "violent", "violenci"],
+       "avanzado": ["violent", "violent", "violent", "violent", "violenci"]
+     }},
+    {"id": "derivadas-en", "grupo": "stemming", "texto": "The movies are running and directors worked",
+     "tokens": {
+       "minimo": ["the", "movies", "are", "running", "and", "directors", "worked"],
+       "estandar": ["movi", "run", "director", "work"],
+       "avanzado": ["film", "run", "director", "work"]
+     }},
+    {"id": "obra-es-en-idioma-mixto", "grupo": "sinonimos", "texto": "la película y the movie, el filme y the cinema",
+     "tokens": {
+       "minimo": ["la", "película", "the", "movie", "el", "filme", "the", "cinema"],
+       "estandar": ["pelicul", "movi", "film", "cinem"],
+       "avanzado": ["film", "film", "film", "film"]
+     }},
+    {"id": "oficios-es", "grupo": "tesauro", "texto": "El director y la guionista, el actor y la actriz, el cineasta del reparto y el productor",
+     "tokens": {
+       "minimo": ["el", "director", "la", "guionista", "el", "actor", "la", "actriz", "el", "cineasta", "del", "reparto", "el", "productor"],
+       "estandar": ["director", "guionist", "actor", "actriz", "cineast", "repart", "productor"],
+       "avanzado": ["realiz", "screenwrit", "interpret", "interpret", "realiz", "cast", "produc"]
+     }},
+    {"id": "oficios-en", "grupo": "tesauro", "texto": "The filmmaker and the screenwriter, the actor, the cast and the producer",
+     "tokens": {
+       "minimo": ["the", "filmmaker", "and", "the", "screenwriter", "the", "actor", "the", "cast", "and", "the", "producer"],
+       "estandar": ["filmmak", "screenwrit", "actor", "cast", "produc"],
+       "avanzado": ["realiz", "screenwrit", "interpret", "cast", "produc"]
+     }},
+    {"id": "ambiguos-no-se-mapean", "grupo": "tesauro", "texto": "The star wars score and the short feature editor",
+     "tokens": {
+       "minimo": ["the", "star", "wars", "score", "and", "the", "short", "feature", "editor"],
+       "estandar": ["star", "war", "score", "short", "featur", "editor"],
+       "avanzado": ["star", "war", "score", "short", "featur", "editor"]
+     }},
+    {"id": "fecha-numerica", "grupo": "fechas", "texto": "Estreno 25/12/1977 y 1977-10-15",
+     "tokens": {
+       "minimo": ["estreno", "25", "12", "1977", "1977-10-15"],
+       "estandar": ["estren", "25", "12", "1977", "1977-10-15"],
+       "avanzado": ["estren", "<FECHA>", "<FECHA>"]
+     }},
+    {"id": "fecha-textual-es", "grupo": "fechas", "texto": "Se estrenó el 25 de diciembre de 1977 en Estados Unidos",
+     "tokens": {
+       "minimo": ["se", "estrenó", "el", "25", "de", "diciembre", "de", "1977", "en", "estados", "unidos"],
+       "estandar": ["estren", "25", "diciembr", "1977", "unid"],
+       "avanzado": ["estren", "<FECHA>", "unid"]
+     }},
+    {"id": "fecha-textual-en", "grupo": "fechas", "texto": "It premiered on December 25, 1977 and again on 3rd of May 1999",
+     "tokens": {
+       "minimo": ["it", "premiered", "on", "december", "25", "1977", "and", "again", "on", "3rd", "of", "may", "1999"],
+       "estandar": ["premier", "decemb", "25", "1977", "3rd", "1999"],
+       "avanzado": ["premier", "<FECHA>", "<FECHA>"]
+     }},
+    {"id": "anios-en-rango", "grupo": "fechas", "texto": "En 1994 y en 2024 pero no en 1887 ni en 2100",
+     "tokens": {
+       "minimo": ["en", "1994", "en", "2024", "pero", "no", "en", "1887", "ni", "en", "2100"],
+       "estandar": ["1994", "2024", "1887", "2100"],
+       "avanzado": ["<ANIO_1994>", "<ANIO_2024>", "<NUM>", "<NUM>"]
+     }},
+    {"id": "numeros-es", "grupo": "numeros", "texto": "Costó 150 millones y duró 120,5 minutos",
+     "tokens": {
+       "minimo": ["costó", "150", "millones", "duró", "120", "minutos"],
+       "estandar": ["cost", "150", "millon", "dur", "120", "minut"],
+       "avanzado": ["cost", "<NUM>", "millon", "dur", "<NUM>", "minut"]
+     }},
+    {"id": "nombres-propios-es", "grupo": "nombres", "texto": "Quentin Tarantino y George Lucas dirigieron películas",
+     "tokens": {
+       "minimo": ["quentin", "tarantino", "george", "lucas", "dirigieron", "películas"],
+       "estandar": ["quentin", "tarantin", "georg", "luc", "dirig", "pelicul"],
+       "avanzado": ["quentin", "tarantin", "georg", "luc", "dirig", "film"]
+     }},
+    {"id": "nombres-propios-en", "grupo": "nombres", "texto": "The films of Quentin Tarantino and George Lucas",
+     "tokens": {
+       "minimo": ["the", "films", "of", "quentin", "tarantino", "and", "george", "lucas"],
+       "estandar": ["film", "quentin", "tarantino", "georg", "luca"],
+       "avanzado": ["film", "quentin", "tarantino", "georg", "luca"]
+     }},
+    {"id": "parrafo-es", "grupo": "integracion", "texto": "El director de la película “Pulp Fiction” (1994) fue Quentin Tarantino; la banda sonora es genial.",
+     "tokens": {
+       "minimo": ["el", "director", "de", "la", "película", "pulp", "fiction", "1994", "fue", "quentin", "tarantino", "la", "banda", "sonora", "es", "genial"],
+       "estandar": ["director", "pelicul", "pulp", "fiction", "1994", "quentin", "tarantin", "band", "sonor", "genial"],
+       "avanzado": ["realiz", "film", "pulp", "fiction", "<ANIO_1994>", "quentin", "tarantin", "band", "sonor", "genial"]
+     }},
+    {"id": "parrafo-en", "grupo": "integracion", "texto": "The director of the movie Pulp Fiction (1994) was Quentin Tarantino; the soundtrack is great.",
+     "tokens": {
+       "minimo": ["the", "director", "of", "the", "movie", "pulp", "fiction", "1994", "was", "quentin", "tarantino", "the", "soundtrack", "is", "great"],
+       "estandar": ["director", "movi", "pulp", "fiction", "1994", "quentin", "tarantino", "soundtrack", "great"],
+       "avanzado": ["realiz", "film", "pulp", "fiction", "<ANIO_1994>", "quentin", "tarantino", "banda_sonor", "great"]
+     }},
+    {"id": "vacio", "grupo": "borde", "texto": "",
+     "tokens": {
+       "minimo": [],
+       "estandar": [],
+       "avanzado": []
+     }},
+    {"id": "solo-stopwords", "grupo": "borde", "texto": "el de la que the of and",
+     "tokens": {
+       "minimo": ["el", "de", "la", "que", "the", "of", "and"],
+       "estandar": [],
+       "avanzado": []
+     }}
+  ]
+}

@@ -51,18 +51,18 @@ tercera heredarían el pico de la primera y la comparación no diría nada.
 Cada archivo en `configuraciones/` es un `.conf` estilo Linux que fija la
 normalización, el modelo y los parámetros de memoria de SPIMI:
 
-| Archivo | Stopwords | Stemming | Números | Fechas | Sinónimos |
-|---|---|---|---|---|---|
-| `minimo.conf` | No | No | No | No | No |
-| `estandar.conf` | ES+EN | Snowball | No | No | No |
-| `avanzado.conf` | ES+EN | Snowball | Sí | Sí | Sí |
+| Archivo | Stopwords | Stemming | Tildes | Números | Fechas | Sinónimos |
+|---|---|---|---|---|---|---|
+| `minimo.conf` | No | No | Se conservan | No | No | No |
+| `estandar.conf` | ES+EN | Snowball | Se conservan | No | No | No |
+| `avanzado.conf` | ES+EN | Snowball | Se pliegan (conserva la ñ) | Sí | Sí | Sí |
 
 Las tres políticas comparten TF logarítmico, IDF estándar con suavizado y
 normalización coseno.
 
 ## Formato binario `.idx`
 
-Tres secciones consecutivas, todas Little-Endian:
+Cuatro secciones consecutivas, todas Little-Endian:
 
 | Sección | Tamaño | Contenido |
 |---|---|---|
@@ -105,4 +105,12 @@ uv run ruff check
 
 ## Documento
 
-El informe está en `Progra01.pdf`. El enunciado es `Instrucciones.pdf`.
+El informe está en `Progra01.pdf`.
+
+## Normalización, estadísticas e informe (Persona C)
+
+- `recursos/`: stopwords, sinónimos y tesauro compartidos con Lucene; `recursos/README.md` fija el contrato de normalización.
+- `casos_prueba/normalizacion.json`: 28 casos texto → tokens esperados por política. `uv run python scripts/verificar_casos.py` (propio) o `--comando "<programa>"` (Lucene).
+- `scripts/benchmark_comparativo.py`: compara ambos indexadores (tiempo, CPU, RAM, tamaño).
+- `scripts/estadisticas_indices.py`: genera `tablas/` y `datos/` para el informe.
+- `scripts/regenerar_todo.sh [limite]`: pruebas, índices, estadísticas, comparación (si `LUCENE_CMD`) y recompila `Progra01.pdf`. Hay que correrlo tras cambiar el normalizador o `recursos/`.

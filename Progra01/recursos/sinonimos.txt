@@ -1,0 +1,31 @@
+# Sinónimos del dominio audiovisual — recurso compartido por el indexador propio y el de Lucene.
+#
+# Formato Solr/Lucene: "variante1, variante2, ... => forma_canonica", una regla por línea.
+# Lo lee tal cual SolrSynonymParser de Lucene (analysis-common) y el normalizador de Python.
+# Reglas de este archivo:
+#   * Solo se mapean tokens sueltos (el tokenizador separa por espacios); no hay frases.
+#   * Se aplica sobre el token ya en minúsculas, antes de la reducción morfológica.
+#   * Una variante solo entra si significa lo mismo en el corpus audiovisual. Se descartaron
+#     por ambiguas: short, feature, score, star, composer, editor (ver Progra01.pdf, sección 2).
+#   * El lado derecho es el descriptor; el normalizador lo reduce con el stemmer de su idioma
+#     (película -> film; guion -> screenplay; ...), igual que el propio texto del documento.
+
+# Obra audiovisual
+pelicula, peliculas, película, películas, movie, movies, cinema, cine, filme, filmes, motion_picture, motion-picture, cinematografo, cinematógrafo, cinematografico, cinematográfico => film
+
+# Texto del guion
+guion, guiones, guión, script, scripts, screenwriting, libreto, libretos => screenplay
+
+# Banda sonora
+soundtrack, soundtracks, ost => banda_sonora
+
+# Formatos y géneros
+largometraje, largometrajes => largometraje
+cortometraje, cortometrajes => cortometraje
+documental, documentales, documentary, documentaries => documental
+animacion, animación, animation, animated => animacion
+thriller, suspense, suspenso => suspenso
+
+# Técnica
+fotografia, fotografía, cinematography, cinematografia, cinematografía => fotografia
+montaje, edicion, edición, editing => edicion
