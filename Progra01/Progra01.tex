@@ -352,7 +352,7 @@ La Tabla~\ref{tab:politicas} resume qué activa cada configuración. Cada una es
 
 \textbf{Intermedia.} Ventaja: reduce el vocabulario y el archivo sin alterar el significado de las palabras. Desventaja: el stemming une palabras que no deberían unirse y una consulta sin tildes no encuentra texto con tildes.
 
-\textbf{Agresiva.} Ventaja: mayor reducción y tolera consultas sin tildes y en otro idioma gracias al tesauro. Desventaja: pierde la fecha y los valores numéricos exactos, y cada regla del tesauro es una decisión editorial que puede equivocarse.
+\textbf{Agresiva.} Ventaja: mayor reducción y tolera consultas sin tildes y en otro idioma gracias al tesauro. Desventaja: pierde la fecha y los valores numéricos exactos (incluido el año cuando forma parte de una fecha completa), y cada regla del tesauro es una decisión editorial que puede equivocarse.
 
 \subsection{Limitaciones}
 \begin{itemize}
@@ -553,7 +553,7 @@ La Tabla~\ref{tab:consultas} cuenta los documentos que devuelve cada política p
   \end{tabular*}
 \end{table}
 
-Estas cifras cuentan documentos que contienen \emph{algún} término de la consulta, no resultados relevantes: miden cobertura, no precisión, y no hay juicios de relevancia con los que medir esta última. Aun así se ven efectos claros. Con la agresiva, \textit{película} y \textit{movie} se unifican en \texttt{film} y devuelven el mismo conjunto en ambos idiomas; \textit{director} y \textit{cineasta} también convergen. En cambio \textit{Star Wars} devuelve muchos más documentos con la intermedia que con la mínima porque el stemmer une \textit{star} y \textit{stars}, y la consulta de un año (\textit{1994}) se vuelve \texttt{<ANIO\_1994>} y conserva su cobertura exacta.
+Estas cifras cuentan documentos que contienen \emph{algún} término de la consulta, no resultados relevantes: miden cobertura, no precisión, y no hay juicios de relevancia con los que medir esta última. Aun así se ven efectos claros. Con la agresiva, \textit{película} y \textit{movie} se unifican en \texttt{film} y devuelven el mismo conjunto en ambos idiomas; \textit{director} y \textit{cineasta} también convergen. En cambio \textit{Star Wars} devuelve muchos más documentos con la intermedia que con la mínima porque el stemmer une \textit{star} y \textit{stars}, y la consulta de un año (\textit{1994}) se vuelve \texttt{<ANIO\_1994>}, pero con la agresiva baja de 38 a 27 documentos: un año que aparece dentro de una fecha completa se reemplaza junto con ella por \texttt{<FECHA>} y deja de ser buscable.
 
 \subsection{Comparación entre el indexador propio y el de Lucene}
 
@@ -576,6 +576,44 @@ El script \texttt{scripts/benchmark\_comparativo.py} ejecuta ambos indexadores c
 }{%
 \noindent\fbox{\parbox{0.94\linewidth}{\small \textbf{Pendiente.} La comparación con Lucene aún no tiene cifras: falta el indexador de Lucene. Cuando exista, se mide con \texttt{scripts/regenerar\_todo.sh} definiendo la variable \texttt{LUCENE\_CMD}, y esta tabla aparece sola.}}
 }
+
+\subsection{Composición de la muestra y razón texto-índice}
+
+\IfFileExists{tablas/dominios.tex}{%
+La muestra de 500 documentos reparte su texto de forma muy desigual entre los dominios de origen (Tabla~\ref{tab:dominios}). Los guiones de \texttt{dailyscript.com} son solo el $16{,}4\,\%$ de los documentos, pero aportan más de la mitad del texto, mientras que \texttt{filmaffinity.com} y \texttt{tvmaze.com} contribuyen con fichas muy cortas.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Documentos y texto de la muestra por dominio de origen.}
+  \label{tab:dominios}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrr@{}}
+    \toprule
+    \textbf{Dominio} & \textbf{Documentos} & \textbf{\% docs.} & \textbf{Texto (MB)} \\
+    \midrule
+    \filas{tablas/dominios.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+}{}
+
+\IfFileExists{tablas/razon_texto.tex}{%
+La Tabla~\ref{tab:razon-texto} compara el tamaño de cada índice con el texto del que sale. Incluso la política mínima, que conserva todas las palabras, ocupa poco más de la mitad del texto original, porque el índice guarda cada término una sola vez y solo un registro de doce bytes por par término-documento. Las políticas intermedia y agresiva lo bajan a cerca del $41\,\%$ y el $40\,\%$.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Tamaño del índice frente al texto de la muestra.}
+  \label{tab:razon-texto}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrr@{}}
+    \toprule
+    \textbf{Política} & \textbf{Texto (MB)} & \textbf{Índice (MB)} & \textbf{Índice / texto (\%)} \\
+    \midrule
+    \filas{tablas/razon_texto.tex}
+    \bottomrule
+  \end{tabular*}
+\end{table}
+}{}
 
 \subsection{Escala de la colección}
 
