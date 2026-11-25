@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Encuadre</title>
+  <meta name="description" content="Buscador de guiones y páginas de cine de la colección del curso de Recuperación de Información Textual.">
+  <link rel="icon" href="icono.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <a class="saltar" href="#resultados">Ir a los resultados</a>
+
+  <header class="cabecera" id="cabecera">
+    <a class="marca" href="/" aria-label="Encuadre, volver al inicio">
+      <span class="marca__esquina marca__esquina--a" aria-hidden="true"></span>
+      <span class="marca__texto">Encuadre</span>
+      <span class="marca__esquina marca__esquina--b" aria-hidden="true"></span>
+    </a>
+
+    <form class="busqueda" id="formulario" role="search">
+      <label class="oculto" for="q">Buscar en la colección</label>
+      <input id="q" name="q" type="search" autocomplete="off" spellcheck="false"
+             placeholder="Por ejemplo: director película terror">
+      <label class="oculto" for="indice">Índice</label>
+      <select id="indice" name="indice" title="Política de normalización del índice"></select>
+      <button type="submit">Buscar</button>
+    </form>
+  </header>
+
+  <main>
+    <section class="inicio" id="inicio">
+      <p class="inicio__lema">Guiones, escenas y fichas de películas de la colección que recorrió nuestra araña.</p>
+      <dl class="sintaxis">
+        <div><dt><code>"frase exacta"</code></dt><dd>las palabras juntas y en orden</dd></div>
+        <div><dt><code>+palabra</code></dt><dd>tiene que aparecer</dd></div>
+        <div><dt><code>-palabra</code></dt><dd>descarta los documentos que la tengan</dd></div>
+        <div><dt><code>dominio:imsdb.com</code></dt><dd>solo resultados de ese sitio</dd></div>
+        <div><dt><code>idioma:en</code></dt><dd>solo documentos en inglés (o <code>idioma:es</code>)</dd></div>
+      </dl>
+      <p class="inicio__nota">Las búsquedas encuentran variantes: <em>director</em> también trae <em>directores</em>, <em>cineasta</em> y <em>filmmaker</em> cuando el índice usa el tesauro.</p>
+    </section>
+
+    <div class="pagina-resultados" id="pagina-resultados" hidden>
+      <div class="resumen" id="resumen" aria-live="polite"></div>
+      <div class="cuerpo">
+        <ol class="resultados" id="resultados"></ol>
+        <aside class="filtros" id="filtros" aria-label="Filtrar resultados"></aside>
+      </div>
+      <nav class="paginacion" id="paginacion" aria-label="Páginas de resultados"></nav>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <p>Proyecto 3 del curso IC-8060 Recuperación de Información Textual, Tecnológico de Costa Rica.</p>
+  </footer>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

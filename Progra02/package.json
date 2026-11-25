@@ -1,0 +1,17 @@
+{
+  "name": "buscador-encuadre",
+  "version": "1.0.0",
+  "description": "Interfaz de búsqueda y resultados sobre los índices de Elasticsearch (Proyecto 3, IC-8060 RIT)",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node src/servidor.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "~8.15.0"
+  }
+}
