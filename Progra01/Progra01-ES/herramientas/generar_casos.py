@@ -1,5 +1,8 @@
 """Genera los casos de prueba "texto -> tokens esperados" con el indexador propio.
 
+También escribe recursos/raices_fijas.txt (raíz fija de los términos canónicos)
+con el mismo stemmer que usa el propio, para que Elasticsearch use las mismas.
+
 Ejecuta el Normalizador del propio sobre textos de prueba y sobre una muestra
 de documentos reales de la colección, y guarda los tokens que produce. Luego
 `node src/cli.js verificar` envía los mismos textos a Elasticsearch y compara.
@@ -23,9 +26,52 @@ RAIZ_ES = Path(__file__).resolve().parent.parent  # Progra01-ES
 RAIZ_PROPIO = RAIZ_ES.parent  # Progra01
 sys.path.insert(0, str(RAIZ_PROPIO / "src"))
 
-from indexador.configuracion import ConfiguracionIndexador  # noqa: E402
+from importlib.metadata import PackageNotFoundError, version  # noqa: E402
+
+from indexador.configuracion import ConfiguracionIndexador, ConfiguracionNormalizacion  # noqa: E402
 from indexador.lector_coleccion import LectorColeccion  # noqa: E402
-from indexador.normalizador import Normalizador  # noqa: E402
+from indexador.normalizador import TESAURO_AUDIOVISUAL, Normalizador  # noqa: E402
+
+# Términos con raíz fija en aplicar_stemming_palabra del propio
+CANONICOS_FIJOS = [
+    "realizador", "interpret", "interprete", "pelicula", "largometraje", "cortometraje",
+    "documental", "animacion", "suspenso", "banda_sonora", "fotografia", "edicion",
+    "film", "screenplay", "screenwriter", "cast", "producer",
+]
+
+
+def exportar_raices_fijas() -> Path:
+    """Raíz que el propio asigna sin importar el idioma del documento.
+
+    Se incluye un término si el propio le da la misma raíz con idioma 'es' y
+    'en' (los de raíz fija siempre cumplen; si otro coincide por casualidad,
+    la regla no cambia nada).
+    """
+    try:
+        version_snowball = version("snowballstemmer")
+    except PackageNotFoundError:
+        version_snowball = "desconocida"
+    if version_snowball.split(".")[0].isdigit() and int(version_snowball.split(".")[0]) >= 3:
+        print(
+            f"Aviso: el propio usa snowballstemmer {version_snowball}. Lucene usa el algoritmo de la"
+            " versión 2.x y en inglés algunas raíces cambian (universal, organized, added)."
+            ' Fijá "snowballstemmer>=2.2,<3" en pyproject.toml y corré uv sync.'
+        )
+    normalizador = Normalizador(ConfiguracionNormalizacion(stemming=True))
+    candidatos = dict.fromkeys(CANONICOS_FIJOS + sorted(set(TESAURO_AUDIOVISUAL.values())))
+    lineas = [
+        "# Términos canónicos con raíz fija (aplicar_stemming_palabra del propio).",
+        f"# Generado por herramientas/generar_casos.py con snowballstemmer {version_snowball}.",
+    ]
+    for termino in candidatos:
+        es = normalizador.aplicar_stemming_palabra(termino, idioma="es")
+        en = normalizador.aplicar_stemming_palabra(termino, idioma="en")
+        if es == en:
+            lineas.append(f"{termino} => {es}")
+    salida = RAIZ_ES / "recursos" / "raices_fijas.txt"
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    salida.write_text("\n".join(lineas) + "\n", encoding="utf-8")
+    return salida
 
 
 def normalizar_con_idioma(normalizador: Normalizador, texto: str) -> tuple[list[str], str]:
@@ -95,6 +141,7 @@ def main() -> int:
     salida.parent.mkdir(parents=True, exist_ok=True)
     salida.write_text(json.dumps(casos, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"{len(casos)} casos guardados en {salida}")
+    print(f"Raíces fijas guardadas en {exportar_raices_fijas()}")
     return 0
 
 

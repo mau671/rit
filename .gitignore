@@ -58,3 +58,6 @@ skills-lock.json
 
 # Progra01: los CSV de datos/ alimentan las figuras del informe
 !Progra01/datos/
+
+
+*.idx

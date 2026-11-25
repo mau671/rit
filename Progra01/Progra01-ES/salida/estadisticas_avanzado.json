@@ -1,0 +1,142 @@
+{
+  "nombre_politica": "avanzado",
+  "descripcion": "Política 3: Normalización completa con stopwords, stemming, números, fechas y tesauro de sinónimos",
+  "indexador": "elasticsearch",
+  "version_elasticsearch": "8.15.3",
+  "indice": "rit_avanzado",
+  "total_documentos": 10000,
+  "documentos_es": 1942,
+  "documentos_en": 8058,
+  "tamano_vocabulario": 353503,
+  "vocabulario_es": 126868,
+  "vocabulario_en": 264061,
+  "total_postings": 8521796,
+  "total_tokens": 31132662,
+  "tamano_indice_bytes": 394319876,
+  "tamano_indice_mb": 376.05,
+  "segmentos": 1,
+  "documentos_borrados": 0,
+  "tiempo_segundos": 231.324,
+  "tiempos_fases_segundos": {
+    "carga": 53.252,
+    "estadisticas": 123.442,
+    "normas": 52.882,
+    "compactacion": 1.652
+  },
+  "memoria_jvm": {
+    "heap_usado_mb": 265.67,
+    "heap_maximo_mb": 1024
+  },
+  "postings_por_termino_promedio": 24.11,
+  "bytes_por_documento_promedio": 39431.99,
+  "terminos_mas_frecuentes": [
+    {
+      "termino": "<NUM>",
+      "cf": 544402,
+      "df": 8953
+    },
+    {
+      "termino": "par",
+      "cf": 298041,
+      "df": 561
+    },
+    {
+      "termino": "film",
+      "cf": 168857,
+      "df": 6183
+    },
+    {
+      "termino": "one",
+      "cf": 135901,
+      "df": 6542
+    },
+    {
+      "termino": "get",
+      "cf": 123099,
+      "df": 4925
+    },
+    {
+      "termino": "look",
+      "cf": 120624,
+      "df": 4352
+    },
+    {
+      "termino": "tab",
+      "cf": 116604,
+      "df": 210
+    },
+    {
+      "termino": "fcs0",
+      "cf": 110519,
+      "df": 53
+    },
+    {
+      "termino": "fcs1",
+      "cf": 110519,
+      "df": 53
+    },
+    {
+      "termino": "ltrch",
+      "cf": 110519,
+      "df": 53
+    },
+    {
+      "termino": "rtlch",
+      "cf": 110519,
+      "df": 53
+    },
+    {
+      "termino": "pard",
+      "cf": 107264,
+      "df": 139
+    },
+    {
+      "termino": "itap0",
+      "cf": 105395,
+      "df": 96
+    },
+    {
+      "termino": "back",
+      "cf": 98293,
+      "df": 4697
+    },
+    {
+      "termino": "faaut",
+      "cf": 98013,
+      "df": 72
+    },
+    {
+      "termino": "ql",
+      "cf": 97534,
+      "df": 97
+    },
+    {
+      "termino": "<FECHA>",
+      "cf": 97329,
+      "df": 3484
+    },
+    {
+      "termino": "go",
+      "cf": 86710,
+      "df": 5616
+    },
+    {
+      "termino": "like",
+      "cf": 85418,
+      "df": 5026
+    },
+    {
+      "termino": "see",
+      "cf": 81218,
+      "df": 4638
+    }
+  ],
+  "configuracion": {
+    "codec": "default",
+    "guardar_texto": false,
+    "guardar_posiciones": false,
+    "esquema_tf": "logaritmico",
+    "esquema_idf": "estandar"
+  },
+  "documentos_fallidos": []
+}

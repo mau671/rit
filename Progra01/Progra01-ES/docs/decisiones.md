@@ -37,7 +37,23 @@ elegir un stemmer distinto según el documento (ver sección 4).
 Es un programa independiente de la araña: lee la base y el repositorio que la
 araña ya dejó, y puede correrse en cualquier momento.
 
-## 3. Equivalencia de la normalización paso a paso
+## 3. Una sola fuente de verdad
+
+Para que los dos indexadores no se desincronicen, Elasticsearch no tiene copias
+de las políticas:
+
+- Cada `.conf` de Elasticsearch indica `configuracion_propio`, y las secciones
+  `[normalizacion]` y `[modelo]` se leen del `.conf` del propio.
+- Las stopwords, los sinónimos y el tesauro se leen de `Progra01/recursos/`,
+  los mismos archivos que carga `normalizador.py`.
+- Las raíces fijas de los términos canónicos (`recursos/raices_fijas.txt` de
+  Progra01-ES) las escribe `herramientas/generar_casos.py` usando el stemmer
+  del propio.
+
+Si el grupo cambia una política o una lista, basta volver a correr
+`generar_casos.py` y `verificar`.
+
+## 4. Equivalencia de la normalización paso a paso
 
 El propio normaliza en `Normalizador.normalizar_texto`. Cada paso se replicó
 con un componente del analyzer, en el mismo orden:
@@ -47,41 +63,58 @@ con un componente del analyzer, en el mismo orden:
 | 1 | `unicodedata.normalize("NFKC")` | char filter `icu_normalizer` (`nfkc`, plugin analysis-icu) | todas |
 | 1 | Comillas y rayas tipográficas | char filter `mapping` | todas |
 | 2 | `RE_FECHA_COMPLETA` → `<FECHA>` | char filter `pattern_replace` | avanzado |
+| 2 | `RE_FECHA_TEXTUAL` → `<FECHA>` | char filter `pattern_replace` sin distinguir mayúsculas | avanzado |
 | 2 | `RE_ANIO_CINE` → `<ANIO_1994>` | char filter `pattern_replace` | avanzado |
 | 2 | `RE_NUMERO_GENERAL` → `<NUM>` | char filter `pattern_replace` | avanzado |
 | 3 | `RE_TOKEN.findall` | tokenizer `pattern` con `group: 0` | todas |
-| 4 | `str.lower()` sin tocar marcadores | filtro `lowercase` + 3 `pattern_replace` que restauran `<FECHA>`, `<NUM>`, `<ANIO_x>` | todas |
+| 3 | `str.lower()` sin tocar marcadores | filtro `lowercase` + 3 `pattern_replace` que restauran `<FECHA>`, `<NUM>`, `<ANIO_x>` | todas |
+| 4 | `remover_diacriticos` (conserva la ñ) | `pattern_replace` que protege la ñ + `icu_transform` + `pattern_replace` que la restaura | según `remover_acentos` |
+| 4b | Clíticos del inglés (`it's` → `it`) | filtro `pattern_replace` | con stopwords |
 | 6 | Longitud 2 a 50 | filtro `length` | todas |
-| 6 | Stopwords propias ES + EN | filtro `stop` con la misma lista | estándar, avanzado |
-| 6 | Tesauro (reemplazo) | filtro `synonym` con reglas `variantes => canónico` | avanzado |
+| 6 | Stopwords de `recursos/` | filtro `stop` con las mismas listas | estándar, avanzado |
+| 6 | Sinónimos y tesauro de `recursos/` (reemplazo) | filtro `synonym` con reglas `variantes => canónico` | avanzado |
 | 6 | Raíz fija de términos canónicos | filtro `stemmer_override` | estándar, avanzado |
 | 6 | Marcadores sin stemming | filtro `keyword_marker` | estándar, avanzado |
 | 6 | Snowball según idioma | filtro `snowball` (`Spanish` o `English`) | estándar, avanzado |
 
 Detalles importantes:
 
-- **Expresiones regulares.** Son copia literal de las del propio. Java y Python
-  difieren en `\w`, `\d` y `\b`: en Java solo reconocen ASCII por defecto, y
-  "josé" se partiría en dos tokens. Por eso se usa el flag
-  `UNICODE_CHARACTER_CLASS`, que hace que se comporten como en Python. Se
-  comprobó con un programa en Java que, para los textos de prueba (incluyendo
-  ligaduras, dígitos de ancho completo, ñ, ß y dígitos árabes), los tokens son
-  idénticos a los del propio.
+- **Expresiones regulares.** Son las del propio traducidas a Java. Java y
+  Python no entienden igual `\w`, `\d` y `\b`: en Java, sin flags, solo
+  reconocen ASCII ("josé" se partiría en dos tokens), y con el flag
+  `UNICODE_CHARACTER_CLASS` su `\w` incluye signos combinados, así que una
+  palabra en bengalí queda como un token en Java y se parte en Python. Por eso
+  se escriben de forma explícita: `\w` de Python es `[\p{L}\p{N}_]`, `\d` es
+  `\p{Nd}` y `\b` se reemplaza por *lookarounds* sobre esa misma clase.
 - **El tokenizer `pattern` describe separadores por defecto.** El propio usa
   `findall`, que describe palabras. Con `group: 0` el tokenizer emite cada
   coincidencia completa como token, que es el equivalente de `findall`.
 - **El tesauro reemplaza, no expande.** El propio convierte "película" en
   "film" y "película" deja de existir. Por eso se usan reglas con flecha
   (`película, movie, ... => film`) y no reglas con comas, que agregarían todos
-  los sinónimos en la misma posición. Las reglas están en `recursos/tesauro.txt`,
-  exportadas directamente del diccionario `TESAURO_AUDIOVISUAL` del propio.
-- **Stopwords propias.** No se usa la lista `_spanish_` de Elasticsearch sino
-  exactamente las listas del propio (`recursos/stopwords_es.txt` y
-  `stopwords_en.txt`).
+  los sinónimos en la misma posición. Las reglas se arman en
+  `reglasTesauro` (`src/analizadores.js`) a partir de `sinonimos.txt` y
+  `tesauro.txt` con las mismas reglas que el propio: si una variante aparece
+  dos veces gana la última; las variantes con espacios se omiten porque el
+  propio nunca las ve como un solo token; y si no se quitan tildes, se agregan
+  las formas con tilde de cada variante, que el propio encuentra con su
+  segunda búsqueda sin tildes.
+- **Stopwords del grupo.** No se usa la lista `_spanish_` de Elasticsearch sino
+  exactamente `recursos/stopwords_es.txt` y `stopwords_en.txt`.
+- **La ñ al quitar tildes.** `icu_transform` quitaría también la tilde de la
+  ñ ("año" quedaría "ano"). Antes se cambia la ñ por un carácter de uso privado
+  y después se restaura.
+- **La İ turca.** Python la pasa a minúscula como "i" más un punto combinado y
+  Lucene como "i" sola; un `pattern_replace` antes de `lowercase` la convierte
+  igual que Python.
 - **Snowball y no `stemmer`.** El propio usa la biblioteca `snowballstemmer`,
   que para inglés implementa Porter2. El filtro `stemmer` con `english` de
   Elasticsearch usa el Porter original; el filtro `snowball` con `English` usa
   Porter2, que es el equivalente correcto.
+- **Versión de Snowball.** Lucene trae el algoritmo de Snowball 2.x. La versión
+  3 de `snowballstemmer` cambió algunas raíces en inglés (`universal`,
+  `organized`, `added`) y en español (`animacion`). Por eso el propio fija
+  `snowballstemmer>=2.2,<3`.
 - **Raíces fijas.** El propio aplica siempre el stemmer de español a términos
   como "realizador" o "documental" y siempre el de inglés a "film" o
   "producer", sin importar el idioma del documento. `stemmer_override` asigna
@@ -93,7 +126,7 @@ Detalles importantes:
   sinónimos, así que se pasa todo a minúsculas y luego tres `pattern_replace`
   restauran `<FECHA>`, `<NUM>` y `<ANIO_xxxx>`.
 
-## 4. Detección de idioma
+## 5. Detección de idioma
 
 El propio decide para cada documento si aplica el stemmer de español o de
 inglés: cuenta cuántos de los primeros 300 tokens son stopwords de cada idioma
@@ -103,7 +136,8 @@ Un analyzer de Elasticsearch es una cadena fija y no puede tomar esa decisión.
 Se resolvió así:
 
 1. `idioma.js` replica la heurística del propio (con las mismas listas y los
-   mismos pasos previos: limpieza, marcadores, tokenización y minúsculas).
+   mismos pasos previos: limpieza, marcadores, tokenización, minúsculas,
+   tildes y clíticos).
 2. El documento se envía al campo `contenido_es` o `contenido_en`.
 3. Cada campo tiene su analyzer (`politica_es` con Snowball español y
    `politica_en` con Snowball inglés); el resto de la cadena es idéntico.
@@ -112,7 +146,7 @@ La detección se probó contra el propio sobre 59 documentos sintéticos mezclad
 en las tres políticas: coincidió en 177 de 177 casos. El comando `verificar`
 repite la prueba con documentos reales de la colección.
 
-## 5. Modelo vectorial TF/IDF
+## 6. Modelo vectorial TF/IDF
 
 Elasticsearch eliminó la similitud clásica (TF/IDF) en la versión 7 y usa BM25
 por defecto. Para cumplir con el modelo vectorial se definió una similitud
@@ -142,7 +176,7 @@ en cada posting. Ventaja de Lucene: si se agregan documentos no hay que
 recalcular los pesos (el IDF cambia). Ventaja del propio: buscar es solo
 multiplicar y sumar.
 
-## 6. Decisiones para que la comparación de tamaño y tiempo sea justa
+## 7. Decisiones para que la comparación de tamaño y tiempo sea justa
 
 | Opción | Valor | Motivo |
 |---|---|---|
@@ -157,9 +191,9 @@ multiplicar y sumar.
 Con `guardar_posiciones = true` se pueden hacer búsquedas de frases en el
 Proyecto 3, a cambio de un índice más grande.
 
-## 7. Diferencias conocidas con el propio
+## 8. Diferencias conocidas con el propio
 
-Estas diferencias son pequeñas y el comando `verificar` permite medirlas:
+El comando `verificar` mide cuánto coinciden. Las diferencias que quedan son:
 
 1. **IDF por campo de idioma.** El propio tiene un solo diccionario y calcula
    el IDF con todos los documentos. En Elasticsearch, cada campo lleva sus
@@ -168,24 +202,17 @@ Estas diferencias son pequeñas y el comando `verificar` permite medirlas:
    vocabulario (el reporte une ambos vocabularios), pero sí los valores de los
    pesos. La alternativa, un solo campo, obligaría a usar un único stemmer para
    toda la colección.
-2. **Tesauro sin tildes.** Si una palabra no está en el tesauro, el propio
-   prueba también sin tildes. En Elasticsearch solo se aplican las formas que
-   aparecen en el tesauro (que ya incluye las variantes con y sin tilde de casi
-   todas las palabras).
-3. **Entradas con espacios.** "motion picture" y "short film" se omitieron del
-   tesauro. El propio tampoco las aplica nunca, porque su tokenizador produce
-   palabras sueltas; si se incluyeran, Elasticsearch sí las aplicaría y los
-   índices dejarían de coincidir.
-4. **Minúsculas y longitud en caracteres raros.** Java y Python pasan a
-   minúsculas de forma distinta algunos caracteres especiales (por ejemplo, la
-   İ turca), y Lucene mide la longitud en unidades UTF-16 mientras que Python
-   mide en caracteres (afecta solo a emojis y caracteres fuera del plano básico).
-5. **Etiquetas en mayúsculas en el texto original.** Un texto que traiga algo
+2. **Varias tildes en una palabra.** Para la segunda búsqueda del tesauro se
+   generan las variantes con una tilde; una palabra con dos tildes (que el
+   español no admite) no se encontraría.
+3. **Minúsculas y longitud en casos raros.** Además de la İ (resuelta), Python
+   aplica reglas de contexto que Lucene no aplica, como la sigma final griega.
+   Lucene mide la longitud en unidades UTF-16 y Python en caracteres, lo que
+   solo afecta a emojis y caracteres fuera del plano básico.
+4. **Etiquetas en mayúsculas en el texto original.** Un texto que traiga algo
    como `<BR>` lo conserva así en el propio; en Elasticsearch queda `<br>`.
-6. **Versión de Snowball.** Lucene y `snowballstemmer` usan el mismo algoritmo,
-   pero pueden venir de versiones distintas del proyecto Snowball.
 
-## 8. Fuentes
+## 9. Fuentes
 
 - Elasticsearch Reference 8.15: [Text analysis](https://www.elastic.co/guide/en/elasticsearch/reference/8.15/analysis.html),
   [Pattern tokenizer](https://www.elastic.co/guide/en/elasticsearch/reference/8.15/analysis-pattern-tokenizer.html),

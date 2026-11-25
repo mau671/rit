@@ -41,12 +41,17 @@
       "tokenizer": {
         "tokens_propio": {
           "type": "pattern",
-          "pattern": "<[A-Z0-9_]+>|[^\\W_]+(?:[-'_][^\\W_]+)*",
+          "pattern": "<[A-Z0-9_]+>|[\\p{L}\\p{N}]+(?:[-'_][\\p{L}\\p{N}]+)*",
           "group": 0,
           "flags": "UNICODE_CHARACTER_CLASS"
         }
       },
       "filter": {
+        "i_turca": {
+          "type": "pattern_replace",
+          "pattern": "İ",
+          "replacement": "i̇"
+        },
         "longitud": {
           "type": "length",
           "min": 2,
@@ -62,6 +67,7 @@
           ],
           "tokenizer": "tokens_propio",
           "filter": [
+            "i_turca",
             "lowercase",
             "longitud"
           ]
@@ -74,6 +80,7 @@
           ],
           "tokenizer": "tokens_propio",
           "filter": [
+            "i_turca",
             "lowercase",
             "longitud"
           ]

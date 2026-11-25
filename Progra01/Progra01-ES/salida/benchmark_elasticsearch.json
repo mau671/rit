@@ -1,0 +1,428 @@
+[
+  {
+    "nombre_politica": "minimo",
+    "descripcion": "Política 1: Tokenización básica y minúsculas sin stopwords ni stemming",
+    "indexador": "elasticsearch",
+    "version_elasticsearch": "8.15.3",
+    "indice": "rit_minimo",
+    "total_documentos": 10000,
+    "documentos_es": 1941,
+    "documentos_en": 8059,
+    "tamano_vocabulario": 497160,
+    "vocabulario_es": 199154,
+    "vocabulario_en": 368138,
+    "total_postings": 11400365,
+    "total_tokens": 50682834,
+    "tamano_indice_bytes": 226322590,
+    "tamano_indice_mb": 215.84,
+    "segmentos": 1,
+    "documentos_borrados": 0,
+    "tiempo_segundos": 77.494,
+    "tiempos_fases_segundos": {
+      "carga": 13.52,
+      "estadisticas": 49.3,
+      "normas": 11.946,
+      "compactacion": 2.647
+    },
+    "memoria_jvm": {
+      "heap_usado_mb": 764.37,
+      "heap_maximo_mb": 1024
+    },
+    "postings_por_termino_promedio": 22.93,
+    "bytes_por_documento_promedio": 22632.26,
+    "terminos_mas_frecuentes": [
+      {
+        "termino": "the",
+        "cf": 2464824,
+        "df": 8890
+      },
+      {
+        "termino": "to",
+        "cf": 1042947,
+        "df": 8383
+      },
+      {
+        "termino": "and",
+        "cf": 999002,
+        "df": 8251
+      },
+      {
+        "termino": "of",
+        "cf": 938452,
+        "df": 8428
+      },
+      {
+        "termino": "in",
+        "cf": 719725,
+        "df": 8428
+      },
+      {
+        "termino": "de",
+        "cf": 489672,
+        "df": 4582
+      },
+      {
+        "termino": "is",
+        "cf": 476367,
+        "df": 7331
+      },
+      {
+        "termino": "you",
+        "cf": 373183,
+        "df": 6024
+      },
+      {
+        "termino": "his",
+        "cf": 357265,
+        "df": 5737
+      },
+      {
+        "termino": "on",
+        "cf": 345056,
+        "df": 7652
+      },
+      {
+        "termino": "he",
+        "cf": 343939,
+        "df": 5327
+      },
+      {
+        "termino": "it",
+        "cf": 331113,
+        "df": 6281
+      },
+      {
+        "termino": "that",
+        "cf": 311579,
+        "df": 6669
+      },
+      {
+        "termino": "with",
+        "cf": 307613,
+        "df": 7800
+      },
+      {
+        "termino": "par",
+        "cf": 297725,
+        "df": 437
+      },
+      {
+        "termino": "as",
+        "cf": 276070,
+        "df": 6982
+      },
+      {
+        "termino": "for",
+        "cf": 269795,
+        "df": 8114
+      },
+      {
+        "termino": "this",
+        "cf": 243225,
+        "df": 6312
+      },
+      {
+        "termino": "her",
+        "cf": 236403,
+        "df": 5012
+      },
+      {
+        "termino": "at",
+        "cf": 218168,
+        "df": 6765
+      }
+    ],
+    "configuracion": {
+      "codec": "default",
+      "guardar_texto": false,
+      "guardar_posiciones": false,
+      "esquema_tf": "logaritmico",
+      "esquema_idf": "estandar"
+    },
+    "documentos_fallidos": []
+  },
+  {
+    "nombre_politica": "estandar",
+    "descripcion": "Política 2: Minúsculas, eliminación de puntuación, stopwords ES+EN y stemming Snowball",
+    "indexador": "elasticsearch",
+    "version_elasticsearch": "8.15.3",
+    "indice": "rit_estandar",
+    "total_documentos": 10000,
+    "documentos_es": 1941,
+    "documentos_en": 8059,
+    "tamano_vocabulario": 374196,
+    "vocabulario_es": 136699,
+    "vocabulario_en": 277726,
+    "total_postings": 8705413,
+    "total_tokens": 31079435,
+    "tamano_indice_bytes": 220834724,
+    "tamano_indice_mb": 210.6,
+    "segmentos": 1,
+    "documentos_borrados": 0,
+    "tiempo_segundos": 86.553,
+    "tiempos_fases_segundos": {
+      "carga": 16.866,
+      "estadisticas": 52.177,
+      "normas": 15.807,
+      "compactacion": 1.611
+    },
+    "memoria_jvm": {
+      "heap_usado_mb": 539.41,
+      "heap_maximo_mb": 1024
+    },
+    "postings_por_termino_promedio": 23.26,
+    "bytes_por_documento_promedio": 22083.47,
+    "terminos_mas_frecuentes": [
+      {
+        "termino": "par",
+        "cf": 298661,
+        "df": 647
+      },
+      {
+        "termino": "one",
+        "cf": 135900,
+        "df": 6542
+      },
+      {
+        "termino": "get",
+        "cf": 123098,
+        "df": 4924
+      },
+      {
+        "termino": "look",
+        "cf": 120624,
+        "df": 4352
+      },
+      {
+        "termino": "tab",
+        "cf": 116623,
+        "df": 216
+      },
+      {
+        "termino": "fcs0",
+        "cf": 110519,
+        "df": 53
+      },
+      {
+        "termino": "fcs1",
+        "cf": 110519,
+        "df": 53
+      },
+      {
+        "termino": "ltrch",
+        "cf": 110519,
+        "df": 53
+      },
+      {
+        "termino": "rtlch",
+        "cf": 110519,
+        "df": 53
+      },
+      {
+        "termino": "pard",
+        "cf": 107264,
+        "df": 139
+      },
+      {
+        "termino": "itap0",
+        "cf": 105395,
+        "df": 96
+      },
+      {
+        "termino": "film",
+        "cf": 98951,
+        "df": 4830
+      },
+      {
+        "termino": "back",
+        "cf": 98293,
+        "df": 4697
+      },
+      {
+        "termino": "faaut",
+        "cf": 98013,
+        "df": 72
+      },
+      {
+        "termino": "ql",
+        "cf": 97534,
+        "df": 97
+      },
+      {
+        "termino": "go",
+        "cf": 86682,
+        "df": 5608
+      },
+      {
+        "termino": "like",
+        "cf": 85417,
+        "df": 5026
+      },
+      {
+        "termino": "2026",
+        "cf": 82288,
+        "df": 4102
+      },
+      {
+        "termino": "see",
+        "cf": 81217,
+        "df": 4638
+      },
+      {
+        "termino": "anim",
+        "cf": 80344,
+        "df": 4983
+      }
+    ],
+    "configuracion": {
+      "codec": "default",
+      "guardar_texto": false,
+      "guardar_posiciones": false,
+      "esquema_tf": "logaritmico",
+      "esquema_idf": "estandar"
+    },
+    "documentos_fallidos": []
+  },
+  {
+    "nombre_politica": "avanzado",
+    "descripcion": "Política 3: Normalización completa con stopwords, stemming, números, fechas y tesauro de sinónimos",
+    "indexador": "elasticsearch",
+    "version_elasticsearch": "8.15.3",
+    "indice": "rit_avanzado",
+    "total_documentos": 10000,
+    "documentos_es": 1942,
+    "documentos_en": 8058,
+    "tamano_vocabulario": 353503,
+    "vocabulario_es": 126868,
+    "vocabulario_en": 264061,
+    "total_postings": 8521796,
+    "total_tokens": 31132662,
+    "tamano_indice_bytes": 394319876,
+    "tamano_indice_mb": 376.05,
+    "segmentos": 1,
+    "documentos_borrados": 0,
+    "tiempo_segundos": 231.324,
+    "tiempos_fases_segundos": {
+      "carga": 53.252,
+      "estadisticas": 123.442,
+      "normas": 52.882,
+      "compactacion": 1.652
+    },
+    "memoria_jvm": {
+      "heap_usado_mb": 265.67,
+      "heap_maximo_mb": 1024
+    },
+    "postings_por_termino_promedio": 24.11,
+    "bytes_por_documento_promedio": 39431.99,
+    "terminos_mas_frecuentes": [
+      {
+        "termino": "<NUM>",
+        "cf": 544402,
+        "df": 8953
+      },
+      {
+        "termino": "par",
+        "cf": 298041,
+        "df": 561
+      },
+      {
+        "termino": "film",
+        "cf": 168857,
+        "df": 6183
+      },
+      {
+        "termino": "one",
+        "cf": 135901,
+        "df": 6542
+      },
+      {
+        "termino": "get",
+        "cf": 123099,
+        "df": 4925
+      },
+      {
+        "termino": "look",
+        "cf": 120624,
+        "df": 4352
+      },
+      {
+        "termino": "tab",
+        "cf": 116604,
+        "df": 210
+      },
+      {
+        "termino": "fcs0",
+        "cf": 110519,
+        "df": 53
+      },
+      {
+        "termino": "fcs1",
+        "cf": 110519,
+        "df": 53
+      },
+      {
+        "termino": "ltrch",
+        "cf": 110519,
+        "df": 53
+      },
+      {
+        "termino": "rtlch",
+        "cf": 110519,
+        "df": 53
+      },
+      {
+        "termino": "pard",
+        "cf": 107264,
+        "df": 139
+      },
+      {
+        "termino": "itap0",
+        "cf": 105395,
+        "df": 96
+      },
+      {
+        "termino": "back",
+        "cf": 98293,
+        "df": 4697
+      },
+      {
+        "termino": "faaut",
+        "cf": 98013,
+        "df": 72
+      },
+      {
+        "termino": "ql",
+        "cf": 97534,
+        "df": 97
+      },
+      {
+        "termino": "<FECHA>",
+        "cf": 97329,
+        "df": 3484
+      },
+      {
+        "termino": "go",
+        "cf": 86710,
+        "df": 5616
+      },
+      {
+        "termino": "like",
+        "cf": 85418,
+        "df": 5026
+      },
+      {
+        "termino": "see",
+        "cf": 81218,
+        "df": 4638
+      }
+    ],
+    "configuracion": {
+      "codec": "default",
+      "guardar_texto": false,
+      "guardar_posiciones": false,
+      "esquema_tf": "logaritmico",
+      "esquema_idf": "estandar"
+    },
+    "documentos_fallidos": []
+  }
+]

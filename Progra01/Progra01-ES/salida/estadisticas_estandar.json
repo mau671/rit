@@ -1,0 +1,142 @@
+{
+  "nombre_politica": "estandar",
+  "descripcion": "Política 2: Minúsculas, eliminación de puntuación, stopwords ES+EN y stemming Snowball",
+  "indexador": "elasticsearch",
+  "version_elasticsearch": "8.15.3",
+  "indice": "rit_estandar",
+  "total_documentos": 10000,
+  "documentos_es": 1941,
+  "documentos_en": 8059,
+  "tamano_vocabulario": 374196,
+  "vocabulario_es": 136699,
+  "vocabulario_en": 277726,
+  "total_postings": 8705413,
+  "total_tokens": 31079435,
+  "tamano_indice_bytes": 220834724,
+  "tamano_indice_mb": 210.6,
+  "segmentos": 1,
+  "documentos_borrados": 0,
+  "tiempo_segundos": 86.553,
+  "tiempos_fases_segundos": {
+    "carga": 16.866,
+    "estadisticas": 52.177,
+    "normas": 15.807,
+    "compactacion": 1.611
+  },
+  "memoria_jvm": {
+    "heap_usado_mb": 539.41,
+    "heap_maximo_mb": 1024
+  },
+  "postings_por_termino_promedio": 23.26,
+  "bytes_por_documento_promedio": 22083.47,
+  "terminos_mas_frecuentes": [
+    {
+      "termino": "par",
+      "cf": 298661,
+      "df": 647
+    },
+    {
+      "termino": "one",
+      "cf": 135900,
+      "df": 6542
+    },
+    {
+      "termino": "get",
+      "cf": 123098,
+      "df": 4924
+    },
+    {
+      "termino": "look",
+      "cf": 120624,
+      "df": 4352
+    },
+    {
+      "termino": "tab",
+      "cf": 116623,
+      "df": 216
+    },
+    {
+      "termino": "fcs0",
+      "cf": 110519,
+      "df": 53
+    },
+    {
+      "termino": "fcs1",
+      "cf": 110519,
+      "df": 53
+    },
+    {
+      "termino": "ltrch",
+      "cf": 110519,
+      "df": 53
+    },
+    {
+      "termino": "rtlch",
+      "cf": 110519,
+      "df": 53
+    },
+    {
+      "termino": "pard",
+      "cf": 107264,
+      "df": 139
+    },
+    {
+      "termino": "itap0",
+      "cf": 105395,
+      "df": 96
+    },
+    {
+      "termino": "film",
+      "cf": 98951,
+      "df": 4830
+    },
+    {
+      "termino": "back",
+      "cf": 98293,
+      "df": 4697
+    },
+    {
+      "termino": "faaut",
+      "cf": 98013,
+      "df": 72
+    },
+    {
+      "termino": "ql",
+      "cf": 97534,
+      "df": 97
+    },
+    {
+      "termino": "go",
+      "cf": 86682,
+      "df": 5608
+    },
+    {
+      "termino": "like",
+      "cf": 85417,
+      "df": 5026
+    },
+    {
+      "termino": "2026",
+      "cf": 82288,
+      "df": 4102
+    },
+    {
+      "termino": "see",
+      "cf": 81217,
+      "df": 4638
+    },
+    {
+      "termino": "anim",
+      "cf": 80344,
+      "df": 4983
+    }
+  ],
+  "configuracion": {
+    "codec": "default",
+    "guardar_texto": false,
+    "guardar_posiciones": false,
+    "esquema_tf": "logaritmico",
+    "esquema_idf": "estandar"
+  },
+  "documentos_fallidos": []
+}

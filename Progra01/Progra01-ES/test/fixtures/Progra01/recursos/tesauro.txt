@@ -1,0 +1,2 @@
+# prueba
+director, directores, cineasta, motion picture => realizador

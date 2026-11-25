@@ -1,0 +1,3 @@
+# prueba
+película, pelicula, movie => film
+movie => pelicula

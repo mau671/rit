@@ -1,2 +1,6 @@
 node_modules/
 salida/verificacion_*.json
+salida/zipf_*.csv
+salida/*.log
+casos/esperados_*.json
+salida/indice_*.idx

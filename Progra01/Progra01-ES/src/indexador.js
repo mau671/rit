@@ -22,6 +22,7 @@ import { performance } from "node:perf_hooks";
 
 import { iterarDocumentos, contarDocumentos } from "./coleccion.js";
 import { detectarIdioma } from "./idioma.js";
+import { cargarRecursos } from "./recursos.js";
 import { construirIndice, campoDeIdioma, CAMPO_ES, CAMPO_EN } from "./analizadores.js";
 import { pesoTf, idf } from "./similitud.js";
 import { crearCliente, verificarConexion, recrearIndice, estadisticasDisco, memoriaJvm } from "./elastic.js";
@@ -62,7 +63,7 @@ async function cargarColeccion(cliente, config, limite, total, idiomas, normas) 
     for await (const doc of iterarDocumentos(config.rutas, limite)) {
       let idioma = idiomas.get(doc.db_id);
       if (idioma === undefined) {
-        idioma = detectarIdioma(doc.texto, config.normalizacion);
+        idioma = detectarIdioma(doc.texto, config.normalizacion, cargarRecursos(config.rutas.recursos));
         idiomas.set(doc.db_id, idioma);
       }
       enviados++;
@@ -138,7 +139,7 @@ async function calcularEstadisticas(cliente, config, limite, total, idiomas) {
 
   let lote = [];
   for await (const doc of iterarDocumentos(config.rutas, limite)) {
-    const idioma = idiomas.get(doc.db_id) ?? detectarIdioma(doc.texto, config.normalizacion);
+    const idioma = idiomas.get(doc.db_id) ?? detectarIdioma(doc.texto, config.normalizacion, cargarRecursos(config.rutas.recursos));
     lote.push({ db_id: doc.db_id, campo: campoDeIdioma(idioma), texto: doc.texto });
     if (lote.length >= tamanoLote) {
       await procesarLote(lote);

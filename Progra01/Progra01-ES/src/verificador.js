@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { crearCliente, verificarConexion, recrearIndice } from "./elastic.js";
 import { construirIndice, campoDeIdioma } from "./analizadores.js";
 import { detectarIdioma } from "./idioma.js";
+import { cargarRecursos } from "./recursos.js";
 
 /** Primera posición donde difieren dos listas, con contexto. */
 function primeraDiferencia(esperados, obtenidos) {
@@ -32,7 +33,7 @@ function primeraDiferencia(esperados, obtenidos) {
 
 export async function verificar(config, rutaCasos) {
   const politica = config.general.nombre_politica;
-  const ruta = rutaCasos ?? join(config.rutaArchivo, "..", "..", "casos", `esperados_${politica}.json`);
+  const ruta = rutaCasos ?? join(config.raiz, "casos", `esperados_${politica}.json`);
   if (!existsSync(ruta)) {
     throw new Error(
       `No existe ${ruta}.\nGeneralo desde la carpeta del propio con:\n` +
@@ -46,10 +47,11 @@ export async function verificar(config, rutaCasos) {
   const indice = `${config.elasticsearch.indice}_verificacion`;
   await recrearIndice(cliente, indice, construirIndice(config));
 
+  const recursos = cargarRecursos(config.rutas.recursos);
   const resultados = [];
   try {
     for (const caso of casos) {
-      const idiomaJs = detectarIdioma(caso.texto, config.normalizacion);
+      const idiomaJs = detectarIdioma(caso.texto, config.normalizacion, recursos);
       // Se analiza con el idioma del propio, para separar los dos tipos de error
       const r = await cliente.indices.analyze({ index: indice, field: campoDeIdioma(caso.idioma), text: caso.texto });
       const obtenidos = r.tokens.map((t) => t.token);

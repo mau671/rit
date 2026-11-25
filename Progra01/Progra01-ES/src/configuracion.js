@@ -82,10 +82,14 @@ const DEFECTOS = {
   general: {
     nombre_politica: "estandar",
     descripcion: "",
+    // .conf del indexador propio del que se toman [normalizacion] y [modelo]
+    configuracion_propio: "",
   },
   rutas: {
     base_datos: "../../Progra00/almacenamiento/metadatos_araña.db",
     repositorio: "../../Progra00/almacenamiento/repositorio",
+    // stopwords, sinónimos y tesauro compartidos con el propio (Progra01/recursos)
+    recursos: "../recursos",
     directorio_salida: "salida",
   },
   normalizacion: {
@@ -148,6 +152,23 @@ export function cargarConfiguracion(rutaConf) {
     config[seccion] = { ...valores, ...(crudo[seccion] ?? {}) };
   }
 
+  const raiz = resolve(dirname(rutaAbs), "..");
+  const resolver = (r) => (isAbsolute(r) ? r : resolve(raiz, r));
+
+  // Una sola fuente de verdad: si se indica el .conf del propio, las políticas
+  // de normalización y el modelo se leen de ahí y no de este archivo.
+  config.rutaPropio = null;
+  if (config.general.configuracion_propio) {
+    const rutaPropio = resolver(String(config.general.configuracion_propio));
+    if (!existsSync(rutaPropio)) {
+      throw new Error(`No existe el .conf del propio indicado en configuracion_propio: ${rutaPropio}`);
+    }
+    const propio = parsearTextoConf(readFileSync(rutaPropio, "utf-8"));
+    config.normalizacion = { ...DEFECTOS.normalizacion, ...(propio.normalizacion ?? {}) };
+    config.modelo = { ...DEFECTOS.modelo, ...(propio.modelo ?? {}) };
+    config.rutaPropio = rutaPropio;
+  }
+
   // Textos libres que pueden traer comas (el parser los leería como listas)
   for (const clave of ["nombre_politica", "descripcion"]) {
     const v = config.general[clave];
@@ -159,11 +180,11 @@ export function cargarConfiguracion(rutaConf) {
   n.idioma = String(n.idioma).toLowerCase();
   n.modo_numeros = String(n.modo_numeros).toLowerCase();
 
-  const raiz = resolve(dirname(rutaAbs), "..");
-  const resolver = (r) => (isAbsolute(r) ? r : resolve(raiz, r));
   config.rutas.base_datos = resolver(config.rutas.base_datos);
   config.rutas.repositorio = resolver(config.rutas.repositorio);
   config.rutas.directorio_salida = resolver(config.rutas.directorio_salida);
+  config.rutas.recursos = resolver(config.rutas.recursos);
+  config.raiz = raiz;
 
   if (!config.elasticsearch.indice) {
     config.elasticsearch.indice = `rit_${config.general.nombre_politica}`;

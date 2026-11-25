@@ -16,7 +16,7 @@ Progra01-ES/
 ├── Dockerfile               Elasticsearch 8.15.3 + plugin analysis-icu
 ├── docker-compose.yaml      Elasticsearch y Kibana
 ├── configuraciones/         minimo.conf, estandar.conf, avanzado.conf (formato Linux)
-├── recursos/                stopwords, tesauro y raíces exportados del propio
+├── recursos/                raices_fijas.txt (la genera generar_casos.py)
 ├── src/
 │   ├── cli.js               punto de entrada (indexar, verificar, buscar, benchmark)
 │   ├── configuracion.js     lector de .conf (mismo formato que el propio)
@@ -31,9 +31,10 @@ Progra01-ES/
 ├── herramientas/
 │   ├── generar_casos.py     genera los tokens esperados con el propio
 │   └── archivos_lucene.sh   lista los archivos de Lucene de un índice
+├── test/fixtures/           copia mínima del propio para las pruebas
 ├── casos/textos_prueba.txt  textos para la verificación
 ├── docs/                    decisiones y comparación interna
-└── test/                    pruebas unitarias (no requieren Elasticsearch)
+└── test/unidad.test.js      pruebas unitarias (no requieren Elasticsearch)
 ```
 
 Debe quedar dentro de `Progra01`, al lado del indexador propio:
@@ -42,15 +43,19 @@ Debe quedar dentro de `Progra01`, al lado del indexador propio:
 rit/
 ├── Progra00/almacenamiento/      metadatos_araña.db y repositorio/
 └── Progra01/
-    ├── configuraciones/  src/  salida/   (indexador propio)
-    └── Progra01-ES/                     (este proyecto)
+    ├── configuraciones/   políticas (las usan los dos indexadores)
+    ├── recursos/          stopwords, sinónimos y tesauro (los usan los dos)
+    ├── src/  salida/      indexador propio
+    └── Progra01-ES/       este proyecto
 ```
 
 ## Requisitos
 
 - Docker Desktop con al menos 4 GB de RAM asignados.
 - Node.js 22.13 o superior (se usa `node:sqlite`, incluido en Node).
-- Para generar los casos de verificación: el entorno `uv` del propio.
+- Para generar los casos de verificación: el entorno `uv` del propio, con
+  `snowballstemmer>=2.2,<3` en su `pyproject.toml` (Lucene usa el algoritmo
+  de Snowball 2.x; la versión 3 cambia algunas raíces en inglés).
 
 ## Uso paso a paso
 
@@ -76,7 +81,9 @@ npm test
 ### 3. Verificar que la normalización es igual a la del propio
 
 Primero se generan los tokens esperados con el propio (desde la carpeta
-`Progra01`):
+`Progra01`). Este paso también escribe `recursos/raices_fijas.txt`, así que
+hay que repetirlo cada vez que el grupo cambie el tesauro o el stemmer, y
+siempre antes de indexar:
 
 ```bash
 cd ..
@@ -132,10 +139,13 @@ node src/cli.js buscar -c configuraciones/avanzado.conf "film director" --top 5
 
 ## Archivo de configuración
 
-Las secciones `[normalizacion]` y `[modelo]` usan **las mismas claves y valores**
-que los `.conf` del propio, así que cualquier cambio de política se replica
-copiando esas secciones. La sección `[elasticsearch]` controla la estructura
-del índice:
+Las políticas no se repiten aquí: `configuracion_propio` (en `[general]`)
+apunta al `.conf` del propio y de ahí se leen `[normalizacion]` y `[modelo]`.
+`recursos` (en `[rutas]`) apunta a la carpeta de stopwords, sinónimos y
+tesauro del propio. Si un `.conf` no trae `configuracion_propio`, se usan sus
+propias secciones `[normalizacion]` y `[modelo]`.
+
+La sección `[elasticsearch]` controla la estructura del índice:
 
 | Clave | Por defecto | Efecto |
 |---|---|---|
@@ -148,9 +158,9 @@ del índice:
 | `concurrencia` | 2 | envíos bulk simultáneos |
 | `tamano_lote_vectores` | 50 | documentos por petición en la fase de estadísticas |
 
-Para cambiar la fórmula TF/IDF basta editar `esquema_tf`
-(`logaritmico`, `natural`, `binario`) y `esquema_idf`
-(`estandar`, `probabilistico`, `ninguno`).
+La fórmula TF/IDF se toma de `esquema_tf` (`logaritmico`, `natural`,
+`binario`) y `esquema_idf` (`estandar`, `probabilistico`, `ninguno`) del
+`.conf` del propio.
 
 ## Explorar en Kibana (Dev Tools)
 
