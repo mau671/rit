@@ -19,7 +19,7 @@ almacenamiento compartido y el archivo de índice:
 |---|---|---|---|
 | **Almacenamiento** | `Progra00/` | Cosecha web, extracción de texto limpio, deduplicación y persistencia | Completo |
 | **Indexador** | `Progra01/` | Índice invertido binario `.idx`, ponderación TF/IDF y ranking | Completo |
-| **Buscador** | `Progra02/` | Interfaz de búsqueda, evaluación de relevancia y métricas | En curso |
+| **Buscador** | `Progra02/` | Interfaz de búsqueda, evaluación de relevancia y métricas | Completo; faltan los juicios de personas |
 
 ```mermaid
 flowchart LR
@@ -30,10 +30,12 @@ flowchart LR
     BD --> Indexador
     subgraph Indexador["Indexador · Progra01"]
         SPIMI["SPIMI"] --> IDX[(".idx binario")]
+        ES["Elasticsearch"] --> ESL[("índices ES")]
     end
-    IDX --> Buscador
+    ESL --> Buscador
     subgraph Buscador["Buscador · Progra02"]
         Web["Búsqueda +<br/>evaluación"]
+        Met["Métricas"]
     end
 ```
 
@@ -99,17 +101,23 @@ Tres políticas de normalización configurables en `Progra01/configuraciones/`:
 | `avanzado.conf` | Además plegado de tildes, números, fechas y expansión por sinónimos |
 
 ```bash
-cd Progra01
+cd Progra01/propio
 uv sync
 
 uv run indexador indexar --config configuraciones/estandar.conf --limite 1000
 uv run indexador inspeccionar salida/indice_estandar.idx --termino "film"
 uv run indexador buscar salida/indice_estandar.idx "film director" --top 5
-uv run indexador benchmark --limite 500
+uv run indexador benchmark --limite 10000
+bash scripts/regenerar_todo.sh 10000   # índices, estadísticas, comparación y PDF
 ```
 
 `benchmark` compara las tres políticas (vocabulario, postings, tamaño, tiempo y
-memoria pico) y escribe `Progra01/salida/benchmark_indices.json`.
+memoria pico) y escribe `propio/salida/benchmark_indices.json`.
+
+La segunda implementación vive en `Progra01/elasticsearch/` (Node + Elasticsearch
+8.15.3 con el plugin `analysis-icu`) y lee las mismas políticas y los mismos
+recursos que la propia. Levanta el servicio con
+`docker compose up -d --build` dentro de esa carpeta.
 
 > [!NOTE]
 > El indexador lee directamente de `Progra00/almacenamiento/`, así que la ruta
@@ -117,9 +125,20 @@ memoria pico) y escribe `Progra01/salida/benchmark_indices.json`.
 
 ## Buscador
 
-Interfaz web de consulta sobre el índice, con un modo independiente para que la
-persona usuaria marque resultados relevantes y una página de métricas de uso.
-La especificación está en `Progra02/Instrucciones.md`.
+Interfaz web de consulta sobre los índices de Elasticsearch, con un modo
+independiente para que la persona usuaria marque resultados relevantes
+(0/1/2) y una página de métricas (P@k, MAP, nDCG@k, MRR, recall y κ de Cohen).
+La especificación está en `Progra02/Instrucciones.md` y el informe en
+`Progra02/documento/Progra02.pdf`.
+
+```bash
+cd Progra02
+npm install
+npm start            # http://localhost:3000, /evaluar y /metricas
+```
+
+Requiere Elasticsearch corriendo con los índices de `Progra01/elasticsearch/`.
+El buscador enlaza a la página original de cada documento, no al `.txt`.
 
 ## Requisitos
 
