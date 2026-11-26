@@ -92,7 +92,8 @@ escrito a mano con `struct.pack` y `struct.unpack` en Little-Endian: cabecera de
 64 bytes con la firma `ENCUADRE`, construcción por bloques con SPIMI,
 ponderación TF/IDF y ranking por similitud coseno.
 
-Tres políticas de normalización configurables en `Progra01/configuraciones/`:
+Tres políticas de normalización configurables en `Progra01/propio/configuraciones/`,
+compartidas con `Progra01/elasticsearch/`:
 
 | Política | Normalización |
 |---|---|
@@ -150,7 +151,9 @@ El buscador enlaza a la página original de cada documento, no al `.txt`.
 Cada componente se prueba por separado:
 
 ```bash
-cd Progra01 && uv run pytest && uv run ruff check
+cd Progra01/propio && uv run pytest && uv run ruff check src scripts tests
+cd Progra01/elasticsearch && node --test
+cd Progra02 && npm test
 cd "Progra00/arañador" && uv run pytest
 cd Progra00/propio && uv run pytest
 ```
@@ -158,8 +161,24 @@ cd Progra00/propio && uv run pytest
 ## Datos y artefactos
 
 Los corpus descargados, bases de datos, bitácoras, resultados e índices **no se
-versionan**; las reglas comunes están en `.gitignore`. El `Progra00.zip` de
-la raíz es el paquete de entrega del componente de almacenamiento.
+versionan**; las reglas comunes están en `.gitignore`. El `Progra00.tar.gz` de
+la raíz es el paquete anterior del componente de almacenamiento; el paquete
+completo se genera con el script de abajo.
+
+## Entrega
+
+```bash
+bash scripts/empaquetar_entrega.sh
+```
+
+Genera `entrega_rit.tar.gz` en la raíz. Incluye el repositorio Git completo
+(con `.git`), los tres proyectos con sus fuentes LaTeX, PDFs, tablas, datos y
+enunciados, los tres índices `Progra01/propio/salida/indice_*.idx` y los
+artefactos de `Progra01/elasticsearch/salida/`.
+
+El corpus `Progra00/almacenamiento/` se excluye por tamaño (varios GiB). Los
+indexadores lo leen desde esa ruta, así que hay que restaurarlo al descomprimir
+el paquete si se quieren volver a construir los índices.
 
 ## Autores
 
