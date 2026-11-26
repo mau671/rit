@@ -20,14 +20,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parents[1]
+PROYECTO = Path(__file__).resolve().parents[1]
+RAIZ = PROYECTO.parent
 
 
 def tokenizar_python(politica: str, textos: list[str]) -> list[list[str]]:
     from indexador.configuracion import ConfiguracionIndexador
     from indexador.normalizador import Normalizador
 
-    cfg = ConfiguracionIndexador.cargar_desde_archivo(RAIZ / "configuraciones" / f"{politica}.conf")
+    cfg = ConfiguracionIndexador.cargar_desde_archivo(PROYECTO / "configuraciones" / f"{politica}.conf")
     norm = Normalizador(cfg.normalizacion)
     return [norm.normalizar_texto(t) for t in textos]
 

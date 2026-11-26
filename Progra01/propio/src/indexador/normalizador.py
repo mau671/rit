@@ -32,7 +32,7 @@ from .configuracion import ConfiguracionNormalizacion
 # Lucene cargue exactamente las mismas listas. ``INDEXADOR_RECURSOS`` permite
 # apuntar a otro directorio.
 DIRECTORIO_RECURSOS: Final[Path] = Path(
-    os.environ.get("INDEXADOR_RECURSOS") or Path(__file__).resolve().parents[2] / "recursos"
+    os.environ.get("INDEXADOR_RECURSOS") or Path(__file__).resolve().parents[3] / "recursos"
 )
 
 

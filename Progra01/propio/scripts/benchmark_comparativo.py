@@ -28,14 +28,15 @@ import sys
 import time
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parents[1]
+PROYECTO = Path(__file__).resolve().parents[1]
+RAIZ = PROYECTO.parent
 POLITICAS = ("minimo", "estandar", "avanzado")
 
 
 def medir(comando: list[str]) -> dict:
     """Modo interno: corre ``comando`` y devuelve lo que el SO midió para él."""
     t0 = time.perf_counter()
-    res = subprocess.run(comando, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, cwd=RAIZ)
+    res = subprocess.run(comando, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False, cwd=PROYECTO)
     pared = time.perf_counter() - t0
     uso = resource.getrusage(resource.RUSAGE_CHILDREN)
     ultima = res.stdout.strip().splitlines()[-1:] or [""]
@@ -78,7 +79,7 @@ def main() -> int:
     ap.add_argument("--repeticiones", type=int, default=3, help="corridas por política; se reporta la mediana")
     ap.add_argument("--lucene-cmd", help="plantilla del comando de Lucene; sin ella solo se mide el propio")
     ap.add_argument("--politicas", nargs="+", default=list(POLITICAS))
-    ap.add_argument("--salida", default=str(RAIZ / "salida" / "bench"))
+    ap.add_argument("--salida", default=str(PROYECTO / "salida" / "bench"))
     args = ap.parse_args()
 
     salida = Path(args.salida)
@@ -86,7 +87,7 @@ def main() -> int:
     resultados: list[dict] = []
 
     for politica in args.politicas:
-        conf = RAIZ / "configuraciones" / f"{politica}.conf"
+        conf = PROYECTO / "configuraciones" / f"{politica}.conf"
         implementaciones = {"propio": None}
         if args.lucene_cmd:
             implementaciones["lucene"] = args.lucene_cmd

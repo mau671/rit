@@ -23,7 +23,8 @@ from indexador.buscador import BuscadorVectorial
 from indexador.configuracion import ConfiguracionIndexador
 from indexador.lector_binario import LectorIndiceBinario
 
-RAIZ = Path(__file__).resolve().parents[1]
+PROYECTO = Path(__file__).resolve().parents[1]
+RAIZ = PROYECTO.parent
 POLITICAS = ("minimo", "estandar", "avanzado")
 CONSULTAS = [
     "película", "movie", "director", "cineasta", "guion", "screenplay",
@@ -125,8 +126,8 @@ def consultas(idx: Path) -> dict[str, tuple[list[str], int]]:
 
 def texto_coleccion(politica: str, n: int) -> tuple[int, list[tuple[str, int, int]]] | None:
     """Bytes de texto crudo y reparto por dominio de los primeros n documentos, si la colección está a mano."""
-    cfg = ConfiguracionIndexador.cargar_desde_archivo(RAIZ / "configuraciones" / f"{politica}.conf")
-    bd = (RAIZ / cfg.rutas.base_datos).resolve()
+    cfg = ConfiguracionIndexador.cargar_desde_archivo(PROYECTO / "configuraciones" / f"{politica}.conf")
+    bd = (PROYECTO / cfg.rutas.base_datos).resolve()
     if not bd.is_file():
         return None
     with sqlite3.connect(f"file:{bd}?mode=ro", uri=True) as con:
@@ -145,7 +146,7 @@ def escribir(ruta: Path, lineas: list[str]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--salida", default=str(RAIZ / "salida"))
+    ap.add_argument("--salida", default=str(PROYECTO / "salida"))
     args = ap.parse_args()
     sal = Path(args.salida)
     S = {p: analizar(sal / f"indice_{p}.idx") for p in POLITICAS}
@@ -161,7 +162,7 @@ def main() -> int:
     viejas = [
         p for p in POLITICAS
         if bench.get(p, {}).get("huella_normalizacion")
-        != huella_normalizacion(ConfiguracionIndexador.cargar_desde_archivo(RAIZ / "configuraciones" / f"{p}.conf"))
+        != huella_normalizacion(ConfiguracionIndexador.cargar_desde_archivo(PROYECTO / "configuraciones" / f"{p}.conf"))
     ]
     aviso = (
         r"\newcommand{\AvisoCifras}{\par\smallskip\noindent\fbox{\parbox{0.94\linewidth}{\small\textbf{Cifras desactualizadas.} "

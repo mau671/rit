@@ -6,8 +6,8 @@ from indexador.lector_coleccion import LectorColeccion
 
 
 def test_lector_coleccion_lectura_real():
-    ruta_bd = Path("../Progra00/almacenamiento/metadatos_araña.db")
-    ruta_repo = Path("../Progra00/almacenamiento/repositorio")
+    ruta_bd = Path("../../Progra00/almacenamiento/metadatos_araña.db")
+    ruta_repo = Path("../../Progra00/almacenamiento/repositorio")
 
     lector = LectorColeccion(ruta_bd, ruta_repo)
     total_db = lector.contar_documentos()
