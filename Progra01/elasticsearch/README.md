@@ -214,9 +214,10 @@ bash herramientas/archivos_lucene.sh rit_estandar
   la escritura de todos los índices. Liberar espacio o subir los umbrales
   (`PUT _cluster/settings` con `cluster.routing.allocation.disk.watermark.flood_stage`).
 - **El índice `rit_minimo` quedó vacío en el contenedor** tras una corrida de
-  benchmark interrumpida (las cifras del informe no dependen de los índices
-  vivos: salen de `salida/benchmark_elasticsearch.json`). Para reconstruirlo:
-  `docker compose up -d` y
+  benchmark interrumpida; ya fue reindexado (2026-11-25) con sus 10 000
+  documentos y vocabulario 519 119 (las cifras del informe no dependen de los
+  índices vivos: salen de `salida/benchmark_elasticsearch.json`). Si vuelve a
+  pasar, reconstruirlo con `docker compose up -d` y
   `node src/cli.js indexar --config configuraciones/minimo.conf --limite 10000`.
 - **Los tamaños del store varían entre corridas**: el disco reportado incluye
   `_recovery_source`, una copia interna del documento original que expira sola
