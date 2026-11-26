@@ -14,9 +14,9 @@ const CLAVE_EVALUADOR = "encuadre.evaluador";
 const NOMBRES_INDICE = { rit_avanzado: "Avanzado", rit_estandar: "Estándar", rit_minimo: "Mínimo", rit_evaluacion: "Muestra" };
 const NOMBRES_IDIOMA = { es: "Español", en: "Inglés" };
 const ETIQUETAS_NOTA = {
-  0: { boton: "0 · No", estado: "Juzgado: no relevante" },
-  1: { boton: "1 · Relevante", estado: "Juzgado: relevante" },
-  2: { boton: "2 · Muy relevante", estado: "Juzgado: muy relevante" },
+  0: { boton: "No relevante", estado: "Guardado como no relevante" },
+  1: { boton: "Relevante", estado: "Guardado como relevante" },
+  2: { boton: "Muy relevante", estado: "Guardado como muy relevante" },
 };
 
 const estado = {
@@ -111,15 +111,6 @@ function leerEvaluadorLocal() {
 
 function pintarIdentidad() {
   const nombre = estado.evaluador;
-  $("estado-identidad").replaceChildren(
-    ...(nombre
-      ? [
-          "Evaluando como ",
-          el("strong", {}, nombre),
-          ". Cada nota queda guardada con este nombre; cambiarlo separa tus juicios de los de otra persona.",
-        ]
-      : ["Sin nombre: podés mirar los resultados, pero para marcar necesitás identificarte."]),
-  );
   const params = new URLSearchParams();
   if (nombre) params.set("evaluador", nombre);
   const cadena = params.toString();
@@ -186,7 +177,7 @@ function pintarBotonera(r) {
   );
 
   return el("div", { class: "juicio", role: "group", "aria-label": `Relevancia de ${r.titulo}` },
-    el("span", { class: "juicio__etiqueta" }, "¿Responde a la consulta?"),
+    el("span", { class: "juicio__etiqueta" }, "Relevancia"),
     botones,
     el("span", { class: "juicio__estado", "data-estado": nota === null ? "" : "guardado" }, etiqueta),
   );
@@ -261,18 +252,13 @@ function actualizarProgreso() {
   const enPagina = datos.resultados.filter((r) => estado.juicios.has(String(r.id))).length;
   const resumen = estado.resumen;
   const juzgados = resumen?.total ?? enPagina;
-  const relevantes = (resumen?.por_relevante?.[1] ?? 0) + (resumen?.por_relevante?.[2] ?? 0);
-  const muyRelevantes = resumen?.por_relevante?.[2] ?? 0;
   const objetivo = Math.max(1, Math.min(datos.por_pagina, datos.total || datos.por_pagina));
   const avance = Math.min(100, Math.round((100 * juzgados) / objetivo));
 
   $("resumen-eval").replaceChildren(
     el("p", {},
-      `En esta página: `,
       el("strong", {}, `${enPagina} de ${datos.resultados.length}`),
-      ` juzgados. En la consulta llevás `,
-      el("strong", {}, `${juzgados} ${juzgados === 1 ? "juicio" : "juicios"}`),
-      relevantes ? `, ${relevantes} marcados como relevantes (${muyRelevantes} muy relevantes).` : ".",
+      " resultados juzgados en esta página",
     ),
   );
   $("barra").setAttribute("aria-valuenow", String(avance));
@@ -337,7 +323,7 @@ async function marcar(r, nota) {
     if (anterior && Number(anterior.relevante) === nota) {
       await pedirJson(`/api/evaluacion/juicios?${paramsJuicio(docId)}`, { method: "DELETE" });
       estado.juicios.delete(docId);
-      mensaje("Juicio eliminado. Podés marcarlo de nuevo cuando quieras.", "");
+      mensaje("Juicio eliminado, podés marcarlo de nuevo cuando quieras", "");
     } else {
       const { juicio } = await pedirJson("/api/evaluacion/juicios", {
         method: "POST",
@@ -411,7 +397,7 @@ async function cargarResultados() {
     $("barra-relleno").style.width = "0%";
     $("resultados").replaceChildren(el("li", { class: "vacio" },
       el("h2", {}, "No se pudo cargar la búsqueda"),
-      el("p", {}, "Revisá que Elasticsearch esté corriendo y que el índice exista. Después recargá la página."),
+      el("p", {}, "Revisá que Elasticsearch esté corriendo y que el índice exista, y después recargá la página"),
     ));
     return;
   }
@@ -458,18 +444,18 @@ async function cargarCola() {
   try {
     const datos = await pedirJson(`/api/evaluacion/consultas?${params}`);
     if (!datos.consultas.length) {
-      $("estado-cola").textContent = "Todavía no hay búsquedas registradas. Escribí una consulta arriba para empezar.";
-      $("lista-cola").replaceChildren();
+      $("lista-cola").replaceChildren(
+        el("li", { class: "cola-vacia" }, "Todavía no hay consultas registradas"),
+      );
       return;
     }
-    $("estado-cola").textContent = `${datos.consultas.length} consulta${datos.consultas.length === 1 ? "" : "s"} en el registro. Las más usadas aparecen primero.`;
     $("lista-cola").replaceChildren(...datos.consultas.slice(0, 12).map((c) => {
       const objetivo = c.objetivos || 0;
       const propios = c.juzgados_por_evaluador;
       const completa = objetivo > 0 && propios >= objetivo;
       const avance = estado.evaluador
-        ? `${propios}/${objetivo} juzgados por vos`
-        : `${c.documentos_juzgados} documento${c.documentos_juzgados === 1 ? "" : "s"} juzgado${c.documentos_juzgados === 1 ? "" : "s"}`;
+        ? `${propios} de ${objetivo} juzgadas`
+        : `${c.documentos_juzgados} juzgadas`;
       return el("li", {},
         el("a", {
           href: urlDe({ q: c.consulta, pagina: 1, indice: c.indice, evaluador: estado.evaluador }),
@@ -480,14 +466,16 @@ async function cargarCola() {
         },
           c.consulta,
           el("span", { class: "meta" },
-            `${NOMBRES_INDICE[c.indice] ?? c.indice} · ${c.veces} búsqueda${c.veces === 1 ? "" : "s"} · `,
+            NOMBRES_INDICE[c.indice] ?? c.indice,
             el("span", { class: completa ? "completa" : "avance" }, avance),
           ),
         ),
       );
     }));
-  } catch (err) {
-    $("estado-cola").textContent = `No se pudo cargar la cola de consultas: ${err.message}`;
+  } catch {
+    $("lista-cola").replaceChildren(
+      el("li", { class: "cola-vacia" }, "No se pudo cargar el historial de consultas"),
+    );
   }
 }
 
@@ -525,18 +513,10 @@ async function mostrar() {
 
 // --------------------------------------------------------------- Eventos
 
-$("form-evaluador").addEventListener("submit", (ev) => {
-  ev.preventDefault();
-  const nombre = $("evaluador").value.trim();
-  if (!nombre) {
-    $("evaluador").focus();
-    return;
-  }
-  ponerEvaluador(nombre, { refrescar: false });
+$("evaluador").addEventListener("input", () => {
+  ponerEvaluador($("evaluador").value, { refrescar: false });
   const e = leerEstadoUrl();
   history.replaceState(null, "", urlDe({ ...e, indice: $("indice").value || e.indice, evaluador: estado.evaluador }));
-  mensaje(`Listo: evaluás como ${estado.evaluador}.`, "ok");
-  mostrar();
 });
 
 $("form-busqueda").addEventListener("submit", (ev) => {

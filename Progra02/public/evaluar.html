@@ -33,20 +33,15 @@
   <main>
     <div class="intro-eval">
       <h1>Evaluación de relevancia</h1>
-      <p class="intro-eval__texto">Buscá una consulta y marcá cada resultado según qué tanto responde a lo que
-        se buscaba: <strong>0</strong> no relevante, <strong>1</strong> relevante, <strong>2</strong> muy relevante.
-        Las notas se guardan una por documento y consulta: podés cerrar la página y continuar después.</p>
+      <p class="intro-eval__texto">Buscá una consulta y marcá cada resultado según qué tanto responde a lo que se buscaba, donde <strong>0</strong> significa que no es relevante, <strong>1</strong> que es relevante y <strong>2</strong> que es muy relevante, y las notas se guardan una por documento y por consulta para que podás cerrar la página y continuar después.</p>
     </div>
 
     <section class="panel-identidad" aria-labelledby="titulo-identidad">
       <h2 id="titulo-identidad">¿Quién evalúa?</h2>
-      <form id="form-evaluador" class="form-evaluador" autocomplete="off">
+      <div class="form-evaluador">
         <label for="evaluador">Nombre o código</label>
         <input id="evaluador" name="evaluador" type="text" maxlength="80" placeholder="Por ejemplo: mau, e1, María" spellcheck="false">
-        <button type="submit">Usar este nombre</button>
-      </form>
-      <p id="estado-identidad" class="estado-identidad" role="status">Sin nombre: podés mirar los resultados, pero
-        para marcar necesitás identificarte.</p>
+      </div>
     </section>
 
     <form class="buscador-eval" id="form-busqueda" role="search">
@@ -59,21 +54,8 @@
     </form>
 
     <section id="inicio-eval" class="inicio-eval" hidden>
-      <div class="ayuda" aria-labelledby="titulo-ayuda">
-        <h2 id="titulo-ayuda">Cómo se evalúa</h2>
-        <ul>
-          <li>Elegí una consulta de la lista (son búsquedas reales del grupo) o escribí una propia.</li>
-          <li>Marcá cada resultado. La misma nota otra vez borra el juicio, así podés corregir.</li>
-          <li>Con el teclado, <kbd>0</kbd>, <kbd>1</kbd> y <kbd>2</kbd> marcan el primer resultado pendiente.</li>
-          <li>Cuando termines, la página de <a href="/metricas">métricas</a> se recalcula con tus juicios.</li>
-        </ul>
-      </div>
-
       <section class="cola" aria-labelledby="titulo-cola">
         <h2 id="titulo-cola">Consultas registradas</h2>
-        <p class="nota">Estas consultas ya se buscaron en este servidor. Juzgarlas permite medir el sistema
-          sobre usos reales y no solo sobre ejemplos inventados.</p>
-        <p id="estado-cola" class="nota" role="status">Cargando consultas…</p>
         <ol id="lista-cola" class="lista-cola"></ol>
       </section>
     </section>
@@ -88,9 +70,9 @@
         </div>
       </div>
       <div class="controles-eval">
-        <label class="casilla"><input type="checkbox" id="solo-pendientes"> Ocultar los ya juzgados</label>
-        <a id="enlace-exportar" href="/api/evaluacion/juicios" download="juicios.json">Descargar mis juicios (JSON)</a>
-        <a href="/metricas">Ver métricas</a>
+        <label class="casilla"><input type="checkbox" id="solo-pendientes"> Ocultar juzgados</label>
+        <a id="enlace-exportar" href="/api/evaluacion/juicios" download="juicios.json">Descargar JSON</a>
+        <a href="/metricas">Métricas</a>
       </div>
       <p id="mensaje" class="mensaje" role="status" aria-live="polite"></p>
       <ol id="resultados" class="resultados resultados--eval"></ol>

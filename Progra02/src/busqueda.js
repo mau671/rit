@@ -119,7 +119,7 @@ const esErrorDePosiciones = (err) => /position/i.test(JSON.stringify(err?.meta?.
 
 /**
  * Ejecuta una búsqueda. Devuelve el objeto que entrega la API /api/buscar
- * (el formato está documentado en docs/contrato-api.md).
+ * (el formato está documentado en documento/Progra02.tex).
  */
 export async function buscar(cliente, config, { q, pagina = 1, indice }) {
   const inicio = performance.now();

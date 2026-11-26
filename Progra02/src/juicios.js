@@ -2,7 +2,7 @@
 // Persistencia de los juicios de relevancia de la interfaz de evaluación.
 //
 // Un juicio ocupa una línea de un arreglo JSON (`salida/juicios.json`) con esta
-// forma (ver docs/contrato-api.md):
+// forma (contrato en documento/Progra02.tex):
 //
 //   { consulta, indice, doc_id, url, titulo, evaluador, relevante,
 //     rango, timestamp }

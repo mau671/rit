@@ -7,7 +7,7 @@
 //   GET  /                       interfaz de búsqueda (public/index.html)
 //   GET  /evaluar                interfaz de evaluación (public/evaluar.html)
 //   GET  /metricas               página de métricas (renderizada al vuelo)
-//   GET  /api/buscar             búsqueda (ver docs/contrato-api.md)
+//   GET  /api/buscar             búsqueda (contrato en documento/Progra02.tex)
 //   GET  /api/indices            índices disponibles y estado
 //   GET  /api/evaluacion/juicios juicios guardados (con filtros)
 //   POST /api/evaluacion/juicios guarda o actualiza un juicio

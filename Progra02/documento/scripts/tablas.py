@@ -2,7 +2,7 @@
 """Genera las tablas LaTeX del informe a partir de Progra02/salida/.
 
 Fuentes que reconoce (todas opcionales):
-  salida/consultas.jsonl   una búsqueda por línea, según docs/contrato-api.md
+  salida/consultas.jsonl   una búsqueda por línea, según el contrato de Progra02.tex
   salida/juicios.json      juicios 0/1/2 (lista o diccionario con ``juicios``)
   salida/juicios.jsonl     la misma información, una línea por juicio
   salida/metricas.json     métricas ya calculadas (o CSV con métrica,valor)

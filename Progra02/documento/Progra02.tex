@@ -348,13 +348,74 @@ una consulta escrita en español puede recuperar guiones en inglés
 con las mismas consultas evaluadas (sección~\ref{sec:metricas}); hasta que
 existan juicios no se afirma que el índice avanzado sea mejor en nDCG o MAP.
 
-El servidor Node.js sólo expone \texttt{GET /}, \texttt{GET /api/buscar} y
-\texttt{GET /api/indices}. El contrato de datos
-(\texttt{docs/contrato-api.md}) separa al buscador de las interfaces de
-evaluación y métricas: éstas repiten la búsqueda con la misma \texttt{consulta}
-y el mismo \texttt{indice} y comparan los \texttt{id} devueltos con los juicios
-guardados. El registro de cada búsqueda se agrega a
-\texttt{salida/consultas.jsonl} porque \texttt{registrar\_consultas = true}.
+\subsection{Componentes, rutas y contrato de datos}
+\label{sec:rutas}
+
+Encuadre es un servidor Node.js sin dependencias de interfaz: entrega HTML,
+CSS y JavaScript estáticos desde \texttt{public/} y expone una API JSON. Las
+tres páginas son \texttt{/} (búsqueda), \texttt{/evaluar} (evaluación) y
+\texttt{/metricas} (informe de métricas); las dos últimas son modos
+independientes, no paneles de la primera. La Tabla~\ref{tab:rutas} resume las
+rutas y su función.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Rutas del servidor y contrato de datos.}
+  \label{tab:rutas}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}p{5.6cm}p{8.2cm}@{}}
+    \toprule
+    \textbf{Ruta} & \textbf{Función} \\
+    \midrule
+    \texttt{GET /} & Página de búsqueda (\texttt{public/index.html}) \\
+    \texttt{GET /evaluar} & Interfaz de evaluación independiente (\texttt{public/evaluar.html}) \\
+    \texttt{GET /metricas} & Página HTML de métricas, recalculada en cada visita \\
+    \texttt{GET /api/buscar} & Resultados, facetas, fragmentos e interpretación de la consulta \\
+    \texttt{GET /api/indices} & Índices habilitados, número de documentos y disponibilidad \\
+    \texttt{GET /api/evaluacion/juicios} & Juicios guardados, con filtros por consulta, índice, evaluador y documento \\
+    \texttt{POST /api/evaluacion/juicios} & Crea un juicio (201) o actualiza el existente (200) \\
+    \texttt{DELETE /api/evaluacion/juicios} & Borra el juicio de una consulta, documento y evaluador \\
+    \texttt{GET /api/evaluacion/resumen} & Conteos de juicios para la barra de avance \\
+    \texttt{GET /api/evaluacion/consultas} & Cola de consultas registradas y cuánto falta juzgar \\
+    \texttt{GET /api/metricas} & El mismo informe de \texttt{/metricas}, en JSON \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+Las páginas comparten \texttt{/api/buscar} para no duplicar el motor: evaluar
+una consulta es repetir la misma búsqueda y marcar sus resultados, y métricas
+reconstruye el orden que el sistema mostró. Esa separación permite que
+evaluación y métricas no conozcan la consulta de Elasticsearch ni los campos
+del índice: sólo necesitan los identificadores y el rango que devuelve la
+búsqueda.
+
+El registro de cada búsqueda se agrega a \texttt{salida/consultas.jsonl}
+porque \texttt{registrar\_consultas = true}; cada línea guarda fecha, consulta,
+índice, página, total, tiempo de respuesta y los \texttt{id} devueltos. Ese
+archivo alimenta las estadísticas de uso y permite reconstruir el ranking real
+al calcular métricas. Los juicios se guardan aparte, en
+\texttt{salida/juicios.json}, y el último informe se escribe en
+\texttt{salida/metricas.json} para que lo lea el generador de tablas.
+
+\subsection{Decisiones de diseño}
+\label{sec:decisiones-arquitectura}
+
+Cuatro decisiones sostienen la arquitectura. Primera, el buscador no
+reconstruye índices ni relee la colección completa: consulta los índices que ya
+existen y sólo abre el \texttt{.txt} del documento que va a mostrar. Segunda,
+el estado de la búsqueda vive en la URL (\texttt{/?q=director\&p=2\&indice=rit\_minimo}),
+de modo que una dirección se puede compartir, recargar y reutilizar como
+consulta de evaluación. Tercera, los archivos de salida se escriben de forma
+atómica ---archivo temporal y \texttt{rename}--- y cada guardado se serializa
+en una cola del proceso, para que dos pestañas o dos clics rápidos no dejen un
+archivo a medias. Cuarta, si el índice por defecto no está construido, la
+interfaz elige el primero disponible \emph{con documentos}; el servidor no
+oculta esa elección ---el selector muestra cuál se está usando--- y una petición
+explícita a un índice no habilitado responde 400, mientras que un índice
+habilitado pero inexistente en Elasticsearch responde 502. Así el buscador y la
+evaluación siguen funcionando sobre \texttt{rit\_minimo} o sobre el índice de
+muestra \texttt{rit\_evaluacion}, y vuelven solos al índice por defecto cuando
+está disponible.
 
 % =========================================================
 % SECCIÓN 3: INTERFAZ DE BÚSQUEDA
@@ -460,10 +521,46 @@ se puede compartir, recargar y reutilizar como consulta de evaluación.
 \end{lstlisting}
 
 La paginación es de diez resultados y el recorrido se limita a los primeros
-\texttt{maximo\_resultados} (1000), valor que también se documenta en el
-contrato. Si el índice se construyó sin posiciones, una consulta con frases
-provoca un aviso y se repite con palabras sueltas: la limitación se hace
-visible en lugar de entregar un resultado engañoso.
+\texttt{maximo\_resultados} (1000). La Tabla~\ref{tab:respuesta-buscar} resume
+el contrato de \texttt{GET /api/buscar}: la respuesta no es sólo la lista de
+resultados, sino también la interpretación de la consulta y los términos que
+quedaron después de normalizarla, de modo que la interfaz pueda mostrar por qué
+un documento apareció.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Campos de la respuesta de \texttt{GET /api/buscar}.}
+  \label{tab:respuesta-buscar}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}p{3.4cm}p{10.4cm}@{}}
+    \toprule
+    \textbf{Campo} & \textbf{Contenido} \\
+    \midrule
+    \texttt{consulta}, \texttt{indice}, \texttt{pagina} & Eco de la petición: texto buscado, índice usado y página pedida \\
+    \texttt{por\_pagina}, \texttt{total}, \texttt{paginas}, \texttt{tiempo\_ms} & Tamaño de página, total de coincidencias, páginas navegables y tiempo de Elasticsearch \\
+    \texttt{interpretacion} & Listas \texttt{libres}, \texttt{obligatorios}, \texttt{frases}, \texttt{excluidos}, \texttt{dominios} e \texttt{idiomas} que produjo \texttt{consulta.js} \\
+    \texttt{terminos} & Por idioma (\texttt{es}, \texttt{en}), cada término normalizado con \texttt{tf}, \texttt{df}, \texttt{peso} y \texttt{boost} \\
+    \texttt{resultados} & Lista de aciertos con \texttt{rango}, \texttt{id}, \texttt{doc\_id}, \texttt{db\_id}, \texttt{titulo}, \texttt{url}, \texttt{dominio}, \texttt{idioma}, \texttt{tamano\_bytes}, \texttt{similitud}, \texttt{fragmentos}, \texttt{coincidencias} y \texttt{texto\_disponible} \\
+    \texttt{facetas} & Conteo por \texttt{dominio} y por \texttt{idioma}, para la barra lateral \\
+    \texttt{avisos} & Mensajes sobre frases sin posiciones, ausencia de términos de puntaje o falta de registro \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\textbf{Identificador estable y secuencial.} En \texttt{resultados},
+\texttt{id} es el \texttt{\_id} de Elasticsearch y el \texttt{id} de la tabla
+\texttt{documentos} de la araña: sobrevive a una reconstrucción del índice.
+\texttt{doc\_id} es el secuencial del indexador y puede cambiar; viaja como
+texto en los juicios y en el registro de consultas. Comparar un juicio con la
+búsqueda exige usar ese mismo valor de \texttt{doc\_id}, no la posición
+(\texttt{rango}), que sólo se guarda como respaldo.
+
+Los errores de búsqueda siguen el mismo contrato:
+\texttt{\{"error": "mensaje"\}} con código 400 si falta la consulta o el índice
+no está habilitado, y 502 si Elasticsearch no responde o el índice no existe.
+Si el índice se construyó sin posiciones, una consulta con frases provoca un
+aviso y se repite con palabras sueltas: la limitación se hace visible en lugar
+de entregar un resultado engañoso.
 
 % =========================================================
 % SECCIÓN 4: INTERFAZ DE EVALUACIÓN
@@ -471,14 +568,88 @@ visible en lugar de entregar un resultado engañoso.
 \section{Interfaz de evaluación de relevancia}
 \label{sec:evaluacion}
 
-La evaluación es un modo independiente del modo de búsqueda. Se parte de una
-dirección ya registrada (\texttt{/?q=\ldots\&indice=\ldots}), se muestran los
-resultados en el mismo orden que produjo el buscador y la persona evaluadora
-asigna un nivel a cada documento. El contrato exige guardar, como mínimo,
-\texttt{consulta}, \texttt{indice}, \texttt{id}, \texttt{relevante},
-\texttt{rango}, \texttt{fecha} y \texttt{evaluador}. Usar \texttt{id} (el
-\texttt{\_id} de Elasticsearch) y no \texttt{doc\_id} es deliberado: el
-primero es estable aunque se reconstruya el índice.
+La evaluación es un modo independiente del modo de búsqueda: \texttt{/evaluar}
+tiene su propia dirección y su propio JavaScript, comparte \texttt{/api/buscar}
+para no duplicar el motor, pero muestra la consulta, los resultados y los
+botones de nota sin los filtros ni la paginación del buscador cotidiano. Se
+parte de una dirección ya registrada (\texttt{/?q=\ldots\&indice=\ldots}), se
+muestran los resultados en el mismo orden que produjo el buscador y la persona
+evaluadora asigna un nivel a cada documento.
+
+\textbf{La identidad es un nombre, no una cuenta.} El servidor no tiene
+usuarios ni sesiones: el nombre o código de la persona viaja en la URL
+(\texttt{?evaluador=mau}) y en \texttt{localStorage} para retomar la sesión,
+compartir el enlace o separar los juicios de dos evaluadores. La página avisa
+que ese nombre es lo único que distingue a una persona y que no es un mecanismo
+de seguridad.
+
+\subsection{El juicio de relevancia}
+\label{sec:juicio}
+
+Un juicio es un objeto JSON dentro del arreglo \texttt{salida/juicios.json}.
+La Tabla~\ref{tab:juicio} enumera sus campos; los obligatorios los valida el
+servidor y el \texttt{timestamp} lo pone él, nunca el cliente.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Campos de un juicio guardado en \texttt{salida/juicios.json}.}
+  \label{tab:juicio}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}p{2.5cm}p{2.1cm}p{9.0cm}@{}}
+    \toprule
+    \textbf{Campo} & \textbf{Obligatorio} & \textbf{Contenido} \\
+    \midrule
+    \texttt{consulta} & sí & Texto tal como se buscó (máximo 500 caracteres) \\
+    \texttt{indice} & sí & Índice en el que se vio el resultado \\
+    \texttt{doc\_id} & sí & \texttt{id} del resultado en \texttt{/api/buscar}, como texto \\
+    \texttt{id} & lo pone el servidor & Alias de \texttt{doc\_id}; \texttt{tablas.py} cuenta documentos con esta clave \\
+    \texttt{url} & no & URL original del documento (sólo \texttt{http} o \texttt{https}) \\
+    \texttt{titulo} & no & Título mostrado, para leer el archivo sin volver a buscar \\
+    \texttt{evaluador} & sí & Nombre o código de la persona (máximo 80 caracteres) \\
+    \texttt{relevante} & sí & \texttt{0} no relevante, \texttt{1} relevante, \texttt{2} muy relevante \\
+    \texttt{rango} & no & Posición que ocupaba el documento al juzgarlo \\
+    \texttt{timestamp} & lo pone el servidor & Fecha ISO 8601 de la última modificación \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\textbf{Un juicio por consulta, índice, documento y evaluador.} La clave de
+deduplicación normaliza la consulta a minúsculas y espacios simples: buscar
+\emph{Director} con mayúscula y varios espacios entre palabras debe producir la
+misma consulta, a efectos de evaluación, que \texttt{director terror}. Volver a
+marcar el mismo documento actualiza la nota y el \texttt{timestamp} en lugar de
+agregar otra fila, de modo que se
+puede reanudar y corregir sin que las métricas cuenten dos veces el mismo
+documento. En la interfaz, volver a pulsar la nota activa borra el juicio
+(\texttt{DELETE}), que es la forma natural de deshacer un clic equivocado.
+
+\textbf{Escritura atómica y cola por archivo.} Cada guardado se serializa en una
+cola del proceso y se escribe en un archivo temporal que luego se renombra: dos
+clics rápidos o dos pestañas no dejan el archivo a medias ni pierden juicios.
+El arreglo JSON es legible y revisable a mano, suficiente para el volumen del
+curso; una base de datos sería infraestructura innecesaria.
+
+\textbf{La cola de consultas sale del uso real.} \texttt{/api/evaluacion/consultas}
+agrupa \texttt{consultas.jsonl} para mostrar qué se buscó, cuántas veces y
+cuánto falta juzgar: \texttt{objetivos} es
+$\min(\texttt{por\_pagina},\texttt{total})$, \texttt{documentos\_juzgados}
+cuenta a todos los evaluadores y \texttt{juzgados\_por\_evaluador} sólo a la
+persona indicada. Evaluar consultas reales evita el sesgo de inventar ejemplos
+cómodos y alimenta la sección de estadísticas de uso.
+
+\textbf{API de evaluación.} \texttt{GET /api/evaluacion/juicios} devuelve
+\texttt{\{"juicios": [...], "total": n\}} y acepta filtros por
+\texttt{consulta}, \texttt{indice}, \texttt{evaluador} y \texttt{doc\_id}.
+\texttt{POST} recibe el juicio sin \texttt{timestamp} y responde 201 si lo creó
+o 200 si actualizó uno existente, con \texttt{\{"juicio": ..., "creado":
+true|false\}}. \texttt{DELETE} exige \texttt{consulta}, \texttt{doc\_id} y
+\texttt{evaluador}, con \texttt{indice} opcional, y responde
+\texttt{\{"eliminado": true|false, "juicio": ...\}}. Los errores son 400 (campo
+faltante, nota fuera de 0..2, índice no habilitado o URL que no es http), 413
+(cuerpo mayor de 64~KB) y 415 (sin \texttt{content-type: application/json}),
+siempre con \texttt{\{"error": "mensaje"\}}. El resumen
+(\texttt{/api/evaluacion/resumen}) devuelve total, número de consultas, conteo
+por relevancia, conteo por evaluador y fecha del último juicio.
 
 \begin{table}[htbp]
   \centering
@@ -527,11 +698,14 @@ la discrepancia se mide con $\kappa$ en lugar de ignorarse.
 \section{Métricas de evaluación}
 \label{sec:metricas}
 
-Se prevén seis métricas: cuatro suficientes para cumplir el mínimo de tres y
-dos complementarias para analizar cobertura y acuerdo. Todas se calculan sobre
-la lista devuelta por la API comparada con los juicios; salvo $\kappa$, se
-promedian sobre el conjunto de consultas $Q$. Ninguna tiene valor numérico en
-este informe porque aún no hay juicios (sección~\ref{sec:evaluacion}).
+El servidor calcula seis métricas: cinco de ranking (P@k, MAP, nDCG@k, MRR y
+Recall@k), suficientes para cumplir el mínimo de tres, y el acuerdo entre
+evaluadores ($\kappa$) para analizar la consistencia de la escala. Todas se calculan
+sobre la lista devuelta por la API comparada con los juicios; salvo $\kappa$, se
+promedian sobre el conjunto de consultas $Q$. El cálculo vive en
+\texttt{src/metricas.js} y se prueba sin Elasticsearch ni navegador. Ninguna
+tiene valor numérico en este informe porque aún no hay juicios
+(sección~\ref{sec:evaluacion}).
 
 \subsection{Precisión en los primeros $k$ resultados (P@k)}
 \begin{equation}
@@ -568,15 +742,17 @@ solo juicio por consulta, por lo que se reporta junto con P@k y nDCG.
 
 \subsection{nDCG@k (ganancia descontada normalizada)}
 \begin{equation}
-  \mathrm{DCG}@k = \sum_{i=1}^{k}\frac{2^{r_i}-1}{\log_2(i+1)},
+  \mathrm{DCG}@k = \sum_{i=1}^{k}\frac{r_i}{\log_2(i+1)},
   \qquad
   \mathrm{nDCG}@k = \frac{\mathrm{DCG}@k}{\mathrm{IDCG}@k},
 \end{equation}
-donde $r_i \in \{0,1,2\}$ es el nivel del documento en la posición $i$ e
-$\mathrm{IDCG}@k$ es la ganancia del orden ideal. Es la métrica central para
-la escala de tres niveles: recompensa que los documentos nivel 2 suban arriba
-y admite comparar consultas con distinto número de relevantes~\cite{jarvelin2002}.
-Se calcula con $k=10$, el tamaño de página del buscador.
+donde $r_i \in \{0,1,2\}$ es la ganancia del documento en la posición $i$ (o el
+promedio de notas cuando hay varios evaluadores) e $\mathrm{IDCG}@k$ es la
+ganancia del orden ideal, armada con todas las ganancias conocidas de la
+consulta. Es la métrica central para la escala de tres niveles: recompensa que
+los documentos nivel 2 suban arriba y admite comparar consultas con distinto
+número de relevantes~\cite{jarvelin2002}. Se calcula con $k=10$, el tamaño de
+página del buscador.
 
 \subsection{Recall@k}
 \begin{equation}
@@ -606,6 +782,93 @@ de los marginales, por lo que se reporta junto con la distribución de niveles
 de la Tabla~\ref{tab:juicios-resumen}. Requiere que dos personas juzguen los
 mismos documentos; si no se cumple, se marca como ``no calculable'' en lugar de
 inventar un valor.
+
+\subsection{Página, regeneración y archivo}
+\label{sec:pagina-metricas}
+
+\texttt{/metricas} es una página HTML autocontenida (CSS y SVG en línea) que se
+recalcula en cada visita. Acepta los parámetros opcionales \texttt{k} (1 a 50,
+por defecto \texttt{profundidad\_metricas} de \texttt{buscador.conf}, que vale
+10), \texttt{evaluador}, \texttt{indice} y \texttt{consulta}. Si no hay
+juicios, muestra el estado vacío y la lista de consultas reales que todavía no
+tienen juicios; nunca inventa cifras. El formulario de la página vuelve a pedir
+\texttt{/metricas} con los filtros elegidos: ése es el ``regenerar''.
+\texttt{GET /api/metricas} devuelve el mismo informe en JSON. La página presenta
+las cinco métricas principales como tarjetas y las tres más representativas
+(P@k, AP y nDCG@k) en un gráfico por consulta, además de la curva de precisión
+P@1 a P@k y el detalle numérico. Los gráficos de barras y de línea se generan
+como SVG en el servidor, sin bibliotecas externas.
+
+Además de responder, cada generación escribe \texttt{salida/metricas.json}
+---ruta configurable en \texttt{[evaluacion] archivo\_metricas}--- con escritura
+atómica. Es la fuente que lee \texttt{documento/scripts/tablas.py}. El formato
+estable (versión 1) tiene un bloque \texttt{metricas\_globales} con P@k, MAP,
+nDCG@k, MRR, Recall@k y $\kappa$ \textbf{una sola vez cada uno}, más agregados
+por consulta, índice y evaluador, la curva de precisión y las estadísticas de
+uso. Los agregados usan nombres descriptivos (\texttt{precision},
+\texttt{precision\_promedio}, \texttt{ndcg}, \texttt{rango\_reciproco},
+\texttt{recall}) y no repiten las siglas de las métricas globales, porque
+\texttt{tablas.py} promedia cualquier número cuya clave se parezca a una
+métrica y repetir \texttt{P@10} en cada consulta produciría una media que no
+es la del sistema. El nombre \texttt{metricas\_globales} también forma parte del
+contrato: el script canoniza \texttt{P@10} a \texttt{p@k} antes de reconocer
+P@k, nDCG@k y Recall@k dentro de una clave que contenga ``métrica''. Si la
+página se mira con filtros, el archivo guardado se recalcula \emph{sin}
+filtros: una vista parcial nunca se publica como si fuera la global. El archivo
+se escribe aun sin juicios, con valores \texttt{null} y avisos, para que las
+tablas digan ``sin datos'' y no inventen ceros.
+
+\subsection{De dónde sale el ranking}
+\label{sec:ranking-metricas}
+
+Las métricas necesitan el orden que el sistema mostró, no sólo los documentos
+juzgados. Ese orden se reconstruye con \texttt{salida/consultas.jsonl}: se toma
+la última búsqueda de cada página de una consulta e índice y se concatenan en
+orden. Si la consulta nunca se registró (por ejemplo, porque
+\texttt{registrar\_consultas = false}), se usa el \texttt{rango} guardado en
+cada juicio y la página lo advierte. Es una decisión de trazabilidad: el juicio
+no puede ``inventar'' un orden que el buscador no produjo.
+
+Un resultado que nadie marcó cuenta como no relevante, convención de los pools
+de evaluación y de \texttt{trec\_eval}~\cite{buckley2004}. Tiene un sesgo
+conocido: si sólo se juzga el top 10, el recall y la cobertura se miden contra
+ese pool y no contra toda la colección. Por eso la página muestra la cobertura
+de juicios en el top $k$ y acompaña Recall@k con esa advertencia, además de
+listar las consultas reales pendientes.
+
+\textbf{Limitaciones que conviene decir.} (1)~Con un solo evaluador, $\kappa$
+no está definido; la página muestra las métricas por evaluador para que eso sea
+visible y no un cero. (2)~Si se juzgan páginas distintas de una misma consulta,
+el ranking se arma con la última versión de cada página; una consulta que cambió
+de resultados entre visitas puede mezclar versiones. (3)~El registro no guarda
+los resultados de páginas nunca visitadas, así que las métricas sólo evalúan la
+profundidad efectivamente recorrida. (4)~La relevancia es una opinión: por eso
+se guarda el evaluador y se mide el acuerdo en vez de presentar una única
+``verdad''.
+
+\subsection{Convenciones del cálculo}
+\label{sec:convenciones-metricas}
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{P@k} divide entre $k$ aunque el ranking tenga menos puestos: lo
+    que falta cuenta como fallo.
+  \item \textbf{AP} promedia la precisión en cada acierto y divide entre
+    \emph{todos} los relevantes conocidos de la consulta, incluidos los que el
+    sistema no devolvió; \textbf{MAP} es su media.
+  \item \textbf{nDCG@k} usa ganancia lineal (\texttt{0/1/2}) y descuento
+    $\log_2(i+1)$; el ideal se arma con las ganancias conocidas.
+  \item \textbf{Recall@k} es relativo al pool juzgado como relevante, no a toda
+    la colección.
+  \item \textbf{MRR} es $1/\text{posición}$ del primer relevante, y 0 si no hay
+    ninguno.
+  \item \textbf{Varios evaluadores:} la ganancia es el promedio de las notas y
+    un documento cuenta como relevante si al menos la mitad marcó 1 o 2.
+    $\kappa$ de Cohen se calcula por pares sobre los documentos que ambos
+    juzgaron, con juicio binario (nota $\geq 1$).
+  \item \textbf{Métricas indefinidas:} se devuelve \texttt{null} (por ejemplo,
+    recall sin ningún relevante conocido o $\kappa$ con un solo evaluador) y
+    los promedios las ignoran.
+\end{itemize}
 
 % =========================================================
 % SECCIÓN 6: ESTADÍSTICAS DE USO Y RESULTADOS
@@ -667,8 +930,8 @@ Para actualizar el informe basta con correr el script y recompilar.
 
 \subsection{Lectura de los resultados}
 
-La interfaz de métricas prevista por el proyecto presenta los valores numéricos
-y sus gráficos en la página web; el informe reproduce los mismos números en la
+La interfaz de métricas presenta los valores numéricos y sus gráficos en la
+página web; el informe reproduce los mismos números en la
 Tabla~\ref{tab:metricas-resumen} cuando están disponibles. La discusión debe
 comparar los tres índices con las \emph{mismas} consultas: como la consulta se
 normaliza con el analyzer de cada índice, un cambio en nDCG entre
@@ -678,7 +941,110 @@ haya juicios, esta sección documenta el procedimiento y deja constancia
 explícita de la ausencia de datos; no presenta cifras estimadas.
 
 % =========================================================
-% SECCIÓN 7: CONCLUSIONES
+% SECCIÓN 7: INSTALACIÓN Y USO
+% =========================================================
+\section{Instalación y uso}
+\label{sec:uso}
+
+\subsection{Requisitos y arranque}
+\label{sec:arranque}
+
+Encuadre se ejecuta desde \texttt{Progra02/} y necesita Node.js 22.13 o
+superior, Elasticsearch con los índices construidos por
+\texttt{Progra01/elasticsearch} y los textos que dejó la araña en
+\texttt{Progra00/almacenamiento/repositorio/}. El orden de arranque es:
+
+\begin{enumerate}[label=\arabic*.]
+  \item Levantar Elasticsearch y construir los índices desde
+    \texttt{Progra01/elasticsearch}:
+    \begin{lstlisting}
+docker compose up -d --build
+npm run benchmark
+    \end{lstlisting}
+    El segundo comando se puede sustituir por la indexación de una sola
+    política si no se van a comparar las tres.
+  \item Instalar dependencias y comprobar el proyecto desde \texttt{Progra02/}:
+    \begin{lstlisting}
+npm install
+npm test
+npm start
+    \end{lstlisting}
+  \item Abrir \url{http://localhost:3000}.
+\end{enumerate}
+
+\texttt{npm test} ejecuta las pruebas con el runner de Node
+(\texttt{node --test}); las 39 pruebas cubren la sintaxis, los títulos
+derivados de URL, los fragmentos, la persistencia de juicios y las rutas de la
+API, sin necesidad de Elasticsearch. \texttt{npm start} levanta
+\texttt{src/servidor.js} con \texttt{buscador.conf}. Para usar otro archivo:
+\texttt{node src/servidor.js otra.conf}. El puerto y el servidor de
+Elasticsearch se pueden cambiar con las variables de entorno \texttt{PUERTO} y
+\texttt{ELASTICSEARCH\_URL}.
+
+\subsection{Las tres páginas}
+\label{sec:tres-paginas}
+
+\begin{description}[leftmargin=1.4em,itemsep=3pt]
+  \item[\texttt{/}] Búsqueda y resultados. Acepta la sintaxis de la
+    Tabla~\ref{tab:sintaxis}, muestra facetas laterales, fragmentos resaltados y
+    enlaces a la página original. El estado vive en la URL.
+  \item[\texttt{/evaluar}] Evaluación independiente. La persona se identifica
+    con un nombre o código, repite una consulta y marca cada resultado como 0,
+    1 o 2. Los atajos \texttt{0}, \texttt{1} y \texttt{2} marcan el primer
+    resultado pendiente; volver a pulsar la misma nota borra el juicio.
+  \item[\texttt{/metricas}] Informe de métricas. Recalcula P@k, MAP, nDCG@k,
+    MRR, Recall@k y $\kappa$ a partir de los juicios y del registro de
+    búsquedas. Sin juicios muestra el estado vacío y las consultas pendientes.
+\end{description}
+
+\subsection{Configuración y regeneración del informe}
+\label{sec:configuracion}
+
+\texttt{buscador.conf} se organiza en secciones: \texttt{[servidor]} (puerto,
+registro de consultas y archivo JSONL), \texttt{[elasticsearch]} (URL, índice
+por defecto e índices habilitados), \texttt{[coleccion]} (ruta del repositorio
+para los fragmentos), \texttt{[modelo]} (esquemas TF e IDF, que deben coincidir
+con los del índice), \texttt{[resultados]} (tamaño de página, máximo
+recorrible, caracteres y número de fragmentos) y \texttt{[evaluacion]}
+(archivos de juicios y métricas, profundidad por defecto). Las rutas relativas
+se resuelven desde \texttt{Progra02/}.
+
+Los archivos de salida son \texttt{salida/consultas.jsonl} (una búsqueda por
+línea), \texttt{salida/juicios.json} (arreglo de juicios) y
+\texttt{salida/metricas.json} (última foto global). El informe no se escribe a
+mano: \texttt{documento/scripts/tablas.py} lee esos archivos y genera los
+fragmentos \texttt{.tex} de \texttt{documento/tablas/}, que
+\texttt{Progra02.tex} incluye con \texttt{\textbackslash input}. Para
+recompilar, desde \texttt{Progra02/documento/}:
+
+\begin{lstlisting}
+python3 scripts/tablas.py
+tectonic -X compile Progra02.tex
+\end{lstlisting}
+
+El script también se puede invocar desde \texttt{Progra02/} con
+\texttt{python3 documento/scripts/tablas.py}. Hacen falta \texttt{tectonic} y
+Python 3 (sólo biblioteca estándar). El resultado es \texttt{Progra02.pdf}. Si no hay datos, las tablas dicen
+explícitamente \emph{sin datos} y los gráficos se sustituyen por un recuadro que
+lo indica; no se inventan cifras. Conviene volver a correr el script después de
+usar el buscador y la evaluación.
+
+\subsection{Problemas comunes}
+\label{sec:problemas}
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item \textbf{``No hay conexión con Elasticsearch''}: levantar el servicio con
+    \texttt{docker compose up -d} desde \texttt{Progra01/elasticsearch}.
+  \item \textbf{``El índice no existe''} o un índice marcado como no
+    construido: generarlo con
+    \texttt{node src/cli.js indexar -c configuraciones/politica.conf} en
+    \texttt{Progra01/elasticsearch}.
+  \item \textbf{Resultados sin vista previa}: la ruta \texttt{repositorio} de
+    \texttt{buscador.conf} no apunta a la carpeta de la araña.
+\end{itemize}
+
+% =========================================================
+% SECCIÓN 8: CONCLUSIONES
 % =========================================================
 \section{Conclusiones}
 \label{sec:conclusiones}
@@ -772,8 +1138,9 @@ explícita de la ausencia de datos; no presenta cifras estimadas.
   \item \textbf{El registro de uso está activo pero vacío.} La configuración
     tiene \texttt{registrar\_consultas = true} y cada búsqueda escribe fecha,
     consulta, índice, total, tiempo y los \texttt{id} devueltos; al cerrar este
-    informe el archivo no tiene líneas y por eso las Tablas~\ref{tab:uso-resumen}
-    y~\ref{tab:consultas-frecuentes} dicen ``sin datos''.
+    informe el archivo no existe todavía y por eso las
+    Tablas~\ref{tab:uso-resumen} y~\ref{tab:consultas-frecuentes} dicen ``sin
+    datos''.
 
   \item \textbf{La escala 0/1/2 permite más que un juicio binario.} Al
     distinguir ``aporta contexto'' de ``responde la pregunta'', nDCG puede
@@ -785,10 +1152,11 @@ explícita de la ausencia de datos; no presenta cifras estimadas.
     consistencia de la escala, con la interpretación de Landis y Koch; no se
     reporta valor porque no hay dos juegos de juicios sobre los mismos ítems.
 
-  \item \textbf{Se prevén seis métricas, aunque ninguna está calculada.} P@k,
-    MAP, MRR, nDCG@k, Recall@k y $\kappa$ cubren precisión temprana, orden
-    global, primer acierto, ganancia graduada, cobertura y acuerdo; la
-    Tabla~\ref{tab:metricas-resumen} está vacía a la espera de juicios.
+  \item \textbf{Se calculan seis métricas, aunque ninguna tiene valor en este
+    informe.} P@k, MAP, MRR, nDCG@k, Recall@k y $\kappa$ cubren precisión
+    temprana, orden global, primer acierto, ganancia graduada, cobertura y
+    acuerdo; la Tabla~\ref{tab:metricas-resumen} está vacía a la espera de
+    juicios.
 
   \item \textbf{Los juicios individuales varían, pero el orden de sistemas
     suele ser estable.} Voorhees~\cite{voorhees2000} observó ese efecto en TREC;
@@ -797,12 +1165,15 @@ explícita de la ausencia de datos; no presenta cifras estimadas.
 
   \item \textbf{Las pruebas unitarias protegen las piezas que no dependen de
     Elasticsearch.} \texttt{npm test} verifica el analizador de sintaxis, la
-    comilla sin cerrar, los títulos derivados de URL y el resaltado de
-    fragmentos con un cliente falso.
+    comilla sin cerrar, los títulos derivados de URL, el resaltado de fragmentos
+    con un cliente falso, la persistencia de juicios y el cálculo de
+    métricas.
 
-  \item \textbf{El servidor limita la superficie expuesta.} Sólo acepta GET,
-    rechaza rutas estáticas fuera de \texttt{public/} y responde 400 o 502 con
-    mensajes accionables cuando falta la consulta o Elasticsearch no responde.
+  \item \textbf{El servidor limita la superficie expuesta.} Sólo acepta los
+    métodos que necesita ---GET para las páginas y la búsqueda, POST y DELETE
+    para los juicios---, rechaza rutas estáticas fuera de \texttt{public/} y
+    responde 400 o 502 con mensajes accionables cuando falta la consulta o
+    Elasticsearch no responde.
 
   \item \textbf{El informe es regenerable, no transcrito.} Las tablas salen de
     \texttt{salida/} mediante \texttt{scripts/tablas.py}; cuando la evaluación
@@ -822,6 +1193,7 @@ explícita de la ausencia de datos; no presenta cifras estimadas.
 \bibitem{tombros1998} A.~Tombros y M.~Sanderson, ``Advantages of query biased summaries in information retrieval'', en \textit{Proc.\ 21st Annual International ACM SIGIR Conference}, 1998.
 \bibitem{voorhees2000} E.~M. Voorhees, ``Variations in relevance judgments and the measurement of retrieval effectiveness'', \textit{Information Processing \& Management}, vol.~36, n.º~5, pp.~697--716, 2000. \url{https://doi.org/10.1016/S0306-4573(00)00010-8}
 \bibitem{jarvelin2002} K.~Järvelin y J.~Kekäläinen, ``Cumulated gain-based evaluation of IR techniques'', \textit{ACM Transactions on Information Systems}, vol.~20, n.º~4, pp.~422--446, 2002. \url{https://doi.org/10.1145/582415.582418}
+\bibitem{buckley2004} C.~Buckley y E.~M. Voorhees, ``Retrieval evaluation with incomplete information'', en \textit{Proc.\ 27th Annual International ACM SIGIR Conference}, 2004, pp.~25--32. \url{https://doi.org/10.1145/1008992.1009000}
 \bibitem{cohen1960} J.~Cohen, ``A coefficient of agreement for nominal scales'', \textit{Educational and Psychological Measurement}, vol.~20, n.º~1, pp.~37--46, 1960. \url{https://doi.org/10.1177/001316446002000104}
 \bibitem{landis1977} J.~R. Landis y G.~G. Koch, ``The measurement of observer agreement for categorical data'', \textit{Biometrics}, vol.~33, n.º~1, pp.~159--174, 1977. \url{https://doi.org/10.2307/2529310}
 \bibitem{elasticsearch815} Elasticsearch, \textit{Reference 8.15}: Script score query, Post filter, Analyze API y Term vectors API. \url{https://www.elastic.co/guide/en/elasticsearch/reference/8.15/index.html}
