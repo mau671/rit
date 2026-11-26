@@ -135,6 +135,27 @@ a:visited { color: var(--enlace-visto); }
 }
 .busqueda button:hover { background: var(--enlace); border-color: var(--enlace); }
 
+/* ------------------------------------------------- Menú de secciones */
+
+.menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.92rem;
+}
+.menu a {
+  color: var(--tinta-suave);
+  text-decoration: none;
+  padding-bottom: 0.15rem;
+  border-bottom: 2px solid transparent;
+}
+.menu a:visited { color: var(--tinta-suave); }
+.menu a:hover { color: var(--enlace); border-color: var(--enlace); }
+.menu a[aria-current="page"] { color: var(--tinta); border-color: var(--tinta); font-weight: 600; }
+
 /* ------------------------------------------------------------------ Inicio */
 
 .inicio { max-width: var(--medida); padding: 3rem 0 4rem; }

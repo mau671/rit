@@ -68,6 +68,11 @@ const DEFECTOS = {
     fragmentos_por_resultado: 2,
     caracteres_analisis: 400000,
   },
+  evaluacion: {
+    archivo_juicios: "salida/juicios.json",
+    archivo_metricas: "salida/metricas.json",
+    profundidad_metricas: 10,
+  },
 };
 
 export function cargarConfiguracion(ruta) {
@@ -89,6 +94,13 @@ export function cargarConfiguracion(ruta) {
   const resolver = (r) => (isAbsolute(r) ? r : resolve(raiz, r));
   config.coleccion.repositorio = resolver(config.coleccion.repositorio);
   config.servidor.archivo_registro = resolver(config.servidor.archivo_registro);
+  config.evaluacion.archivo_juicios = resolver(config.evaluacion.archivo_juicios);
+  config.evaluacion.archivo_metricas = resolver(config.evaluacion.archivo_metricas);
+
+  const profundidad = Number(config.evaluacion.profundidad_metricas);
+  config.evaluacion.profundidad_metricas =
+    Number.isInteger(profundidad) && profundidad >= 1 && profundidad <= 50 ? profundidad : 10;
+
   config.raiz = raiz;
   return config;
 }

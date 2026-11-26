@@ -9,10 +9,11 @@ const formulario = $("formulario");
 const campoConsulta = $("q");
 const selectorIndice = $("indice");
 
-const NOMBRES_INDICE = { rit_avanzado: "Avanzado", rit_estandar: "Estándar", rit_minimo: "Mínimo" };
+const NOMBRES_INDICE = { rit_avanzado: "Avanzado", rit_estandar: "Estándar", rit_minimo: "Mínimo", rit_evaluacion: "Muestra" };
 const NOMBRES_IDIOMA = { es: "Español", en: "Inglés" };
 
 let indicePorDefecto = "";
+let indiceInicial = "";
 
 /** Crea un elemento con atributos e hijos (texto o nodos). Nunca usa innerHTML. */
 function el(etiqueta, atributos = {}, ...hijos) {
@@ -62,6 +63,10 @@ async function cargarIndices() {
     const r = await fetch("/api/indices");
     const datos = await r.json();
     indicePorDefecto = datos.por_defecto;
+    // Si el índice por defecto no está construido, se ofrece uno que sí tenga
+    // documentos (por ejemplo, mientras Progra01 reconstruye los estándar).
+    const disponibles = datos.indices.filter((i) => i.disponible);
+    indiceInicial = (disponibles.find((i) => i.documentos > 0) ?? disponibles[0])?.nombre ?? indicePorDefecto;
     selectorIndice.replaceChildren(
       ...datos.indices.map((i) =>
         el("option", { value: i.nombre, disabled: !i.disponible },
@@ -199,8 +204,8 @@ function pintarVacio(datos) {
 async function mostrar() {
   const estado = leerEstado();
   campoConsulta.value = estado.q;
-  if (estado.indice) selectorIndice.value = estado.indice;
-  else if (indicePorDefecto) selectorIndice.value = indicePorDefecto;
+  const indice = estado.indice || indiceInicial || indicePorDefecto;
+  if (indice) selectorIndice.value = indice;
 
   const enInicio = !estado.q.trim();
   document.body.classList.toggle("en-inicio", enInicio);
@@ -217,7 +222,7 @@ async function mostrar() {
   $("resumen").replaceChildren(el("p", {}, "Buscando…"));
 
   const params = new URLSearchParams({ q: estado.q, p: String(estado.pagina) });
-  if (estado.indice) params.set("indice", estado.indice);
+  if (indice) params.set("indice", indice);
 
   let datos;
   try {

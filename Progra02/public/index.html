@@ -29,6 +29,14 @@
       <select id="indice" name="indice" title="Política de normalización del índice"></select>
       <button type="submit">Buscar</button>
     </form>
+
+    <nav aria-label="Secciones">
+      <ul class="menu">
+        <li><a href="/" aria-current="page">Buscar</a></li>
+        <li><a href="/evaluar">Evaluar</a></li>
+        <li><a href="/metricas">Métricas</a></li>
+      </ul>
+    </nav>
   </header>
 
   <main>
@@ -42,6 +50,8 @@
         <div><dt><code>idioma:en</code></dt><dd>solo documentos en inglés (o <code>idioma:es</code>)</dd></div>
       </dl>
       <p class="inicio__nota">Las búsquedas encuentran variantes: <em>director</em> también trae <em>directores</em>, <em>cineasta</em> y <em>filmmaker</em> cuando el índice usa el tesauro.</p>
+      <p class="inicio__nota">Para juzgar la calidad de las respuestas está el <a href="/evaluar">modo de evaluación</a>;
+        los resultados de esos juicios se ven en la <a href="/metricas">página de métricas</a>.</p>
     </section>
 
     <div class="pagina-resultados" id="pagina-resultados" hidden>

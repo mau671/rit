@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Evaluar resultados — Encuadre</title>
+  <meta name="description" content="Modo de evaluación de relevancia del buscador Encuadre: marcá resultados como no relevantes, relevantes o muy relevantes.">
+  <link rel="icon" href="icono.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+  <link rel="stylesheet" href="evaluacion.css">
+</head>
+<body class="pagina-eval">
+  <a class="saltar" href="#zona">Ir a los resultados</a>
+
+  <header class="cabecera">
+    <a class="marca" href="/" aria-label="Encuadre, volver al buscador">
+      <span class="marca__esquina marca__esquina--a" aria-hidden="true"></span>
+      <span class="marca__texto">Encuadre</span>
+      <span class="marca__esquina marca__esquina--b" aria-hidden="true"></span>
+    </a>
+    <nav aria-label="Secciones">
+      <ul class="menu">
+        <li><a href="/">Buscar</a></li>
+        <li><a href="/evaluar" aria-current="page">Evaluar</a></li>
+        <li><a href="/metricas">Métricas</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <div class="intro-eval">
+      <h1>Evaluación de relevancia</h1>
+      <p class="intro-eval__texto">Buscá una consulta y marcá cada resultado según qué tanto responde a lo que
+        se buscaba: <strong>0</strong> no relevante, <strong>1</strong> relevante, <strong>2</strong> muy relevante.
+        Las notas se guardan una por documento y consulta: podés cerrar la página y continuar después.</p>
+    </div>
+
+    <section class="panel-identidad" aria-labelledby="titulo-identidad">
+      <h2 id="titulo-identidad">¿Quién evalúa?</h2>
+      <form id="form-evaluador" class="form-evaluador" autocomplete="off">
+        <label for="evaluador">Nombre o código</label>
+        <input id="evaluador" name="evaluador" type="text" maxlength="80" placeholder="Por ejemplo: mau, e1, María" spellcheck="false">
+        <button type="submit">Usar este nombre</button>
+      </form>
+      <p id="estado-identidad" class="estado-identidad" role="status">Sin nombre: podés mirar los resultados, pero
+        para marcar necesitás identificarte.</p>
+    </section>
+
+    <form class="buscador-eval" id="form-busqueda" role="search">
+      <label class="oculto" for="q">Consulta que vas a evaluar</label>
+      <input id="q" name="q" type="search" autocomplete="off" spellcheck="false"
+             placeholder="Consultá la colección y marcá lo que devuelve">
+      <label class="oculto" for="indice">Índice</label>
+      <select id="indice" name="indice" title="Política de normalización del índice"></select>
+      <button type="submit">Buscar y evaluar</button>
+    </form>
+
+    <section id="inicio-eval" class="inicio-eval" hidden>
+      <div class="ayuda" aria-labelledby="titulo-ayuda">
+        <h2 id="titulo-ayuda">Cómo se evalúa</h2>
+        <ul>
+          <li>Elegí una consulta de la lista (son búsquedas reales del grupo) o escribí una propia.</li>
+          <li>Marcá cada resultado. La misma nota otra vez borra el juicio, así podés corregir.</li>
+          <li>Con el teclado, <kbd>0</kbd>, <kbd>1</kbd> y <kbd>2</kbd> marcan el primer resultado pendiente.</li>
+          <li>Cuando termines, la página de <a href="/metricas">métricas</a> se recalcula con tus juicios.</li>
+        </ul>
+      </div>
+
+      <section class="cola" aria-labelledby="titulo-cola">
+        <h2 id="titulo-cola">Consultas registradas</h2>
+        <p class="nota">Estas consultas ya se buscaron en este servidor. Juzgarlas permite medir el sistema
+          sobre usos reales y no solo sobre ejemplos inventados.</p>
+        <p id="estado-cola" class="nota" role="status">Cargando consultas…</p>
+        <ol id="lista-cola" class="lista-cola"></ol>
+      </section>
+    </section>
+
+    <section id="zona" hidden aria-labelledby="titulo-resultados">
+      <h2 id="titulo-resultados" class="oculto">Resultados para evaluar</h2>
+      <p id="resumen-busqueda" class="resumen-busqueda" role="status"></p>
+      <div class="progreso">
+        <p id="resumen-eval" class="resumen-eval" role="status"></p>
+        <div class="barra" id="barra" role="progressbar" aria-label="Avance de la evaluación" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <span id="barra-relleno"></span>
+        </div>
+      </div>
+      <div class="controles-eval">
+        <label class="casilla"><input type="checkbox" id="solo-pendientes"> Ocultar los ya juzgados</label>
+        <a id="enlace-exportar" href="/api/evaluacion/juicios" download="juicios.json">Descargar mis juicios (JSON)</a>
+        <a href="/metricas">Ver métricas</a>
+      </div>
+      <p id="mensaje" class="mensaje" role="status" aria-live="polite"></p>
+      <ol id="resultados" class="resultados resultados--eval"></ol>
+      <nav class="paginacion" id="paginacion" aria-label="Páginas de resultados"></nav>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <p>Modo de evaluación del Proyecto 3, IC-8060 Recuperación de Información Textual, Tecnológico de Costa Rica.
+      Los juicios quedan en <code>salida/juicios.json</code>.</p>
+  </footer>
+
+  <script src="evaluar.js" type="module"></script>
+</body>
+</html>
