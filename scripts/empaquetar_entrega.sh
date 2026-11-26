@@ -137,7 +137,7 @@ require_member "Progra02/Instrucciones.pdf"
 require_member "Progra01/propio/salida/indice_minimo.idx"
 require_member "Progra01/propio/salida/indice_estandar.idx"
 require_member "Progra01/propio/salida/indice_avanzado.idx"
-require_member "Progra01/elasticsearch/salida/comparacion.md"
+require_member "Progra01/elasticsearch/salida/benchmark_elasticsearch.json"
 
 # Comprobaciones por prefijo: tablas y artefactos de Elasticsearch.
 if ! grep -q "^$REPO_NAME/Progra01/tablas/." "$LISTING"; then
