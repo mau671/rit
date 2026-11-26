@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "descripcion": "Casos texto -> tokens esperados que TODO indexador (propio y Lucene) debe cumplir. Cada caso trae los tokens de las tres politicas. El contrato del pipeline esta en recursos/README.md.",
+  "descripcion": "Casos texto -> tokens esperados que TODO indexador (propio y Lucene) debe cumplir. Cada caso trae los tokens de las tres politicas. El contrato del pipeline esta documentado en el informe (Progra01.pdf, seccion Politicas de normalizacion).",
   "politicas": ["minimo", "estandar", "avanzado"],
   "casos": [
     {"id": "puntuacion-es", "grupo": "tokenizacion", "texto": "Hola, mundo: ¡adiós! (otra vez)…",

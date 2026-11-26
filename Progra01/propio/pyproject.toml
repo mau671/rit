@@ -2,7 +2,6 @@
 name = "indexador"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
 authors = [
     { name = "Mauricio González Prendas", email = "me@maugp.com" }
 ]
