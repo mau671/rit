@@ -6,130 +6,132 @@
     "version_elasticsearch": "8.15.3",
     "indice": "rit_minimo",
     "total_documentos": 10000,
-    "documentos_es": 1941,
-    "documentos_en": 8059,
-    "tamano_vocabulario": 497160,
-    "vocabulario_es": 199154,
-    "vocabulario_en": 368138,
-    "total_postings": 11400365,
-    "total_tokens": 50682834,
-    "tamano_indice_bytes": 226322590,
-    "tamano_indice_mb": 215.84,
+    "documentos_es": 1095,
+    "documentos_en": 8905,
+    "tamano_vocabulario": 519119,
+    "vocabulario_es": 201343,
+    "vocabulario_en": 389301,
+    "total_postings": 12119321,
+    "total_tokens": 52853741,
+    "tamano_indice_bytes": 28984311,
+    "tamano_store_bytes": 217438187,
+    "tamano_recuperacion_bytes": 188453876,
+    "tamano_indice_mb": 27.64,
     "segmentos": 1,
     "documentos_borrados": 0,
-    "tiempo_segundos": 77.494,
+    "tiempo_segundos": 314.864,
     "tiempos_fases_segundos": {
-      "carga": 13.52,
-      "estadisticas": 49.3,
-      "normas": 11.946,
-      "compactacion": 2.647
+      "carga": 46.985,
+      "estadisticas": 199.627,
+      "normas": 59.645,
+      "compactacion": 8.316
     },
     "memoria_jvm": {
-      "heap_usado_mb": 764.37,
+      "heap_usado_mb": 768.04,
       "heap_maximo_mb": 1024
     },
-    "postings_por_termino_promedio": 22.93,
-    "bytes_por_documento_promedio": 22632.26,
+    "postings_por_termino_promedio": 23.35,
+    "bytes_por_documento_promedio": 2898.43,
     "terminos_mas_frecuentes": [
       {
         "termino": "the",
-        "cf": 2464824,
-        "df": 8890
+        "cf": 2616438,
+        "df": 9683
       },
       {
         "termino": "to",
-        "cf": 1042947,
-        "df": 8383
+        "cf": 1104198,
+        "df": 9268
       },
       {
         "termino": "and",
-        "cf": 999002,
-        "df": 8251
+        "cf": 1066246,
+        "df": 9148
       },
       {
         "termino": "of",
-        "cf": 938452,
-        "df": 8428
+        "cf": 1011311,
+        "df": 9292
       },
       {
         "termino": "in",
-        "cf": 719725,
-        "df": 8428
-      },
-      {
-        "termino": "de",
-        "cf": 489672,
-        "df": 4582
+        "cf": 765766,
+        "df": 9318
       },
       {
         "termino": "is",
-        "cf": 476367,
-        "df": 7331
+        "cf": 509611,
+        "df": 8312
+      },
+      {
+        "termino": "de",
+        "cf": 444627,
+        "df": 4110
       },
       {
         "termino": "you",
-        "cf": 373183,
-        "df": 6024
+        "cf": 381300,
+        "df": 6819
       },
       {
         "termino": "his",
-        "cf": 357265,
-        "df": 5737
+        "cf": 371955,
+        "df": 6590
       },
       {
         "termino": "on",
-        "cf": 345056,
-        "df": 7652
+        "cf": 362111,
+        "df": 8528
       },
       {
         "termino": "he",
-        "cf": 343939,
-        "df": 5327
+        "cf": 358711,
+        "df": 6156
       },
       {
         "termino": "it",
-        "cf": 331113,
-        "df": 6281
+        "cf": 350262,
+        "df": 7317
       },
       {
         "termino": "that",
-        "cf": 311579,
-        "df": 6669
+        "cf": 340951,
+        "df": 7676
       },
       {
         "termino": "with",
-        "cf": 307613,
-        "df": 7800
+        "cf": 327892,
+        "df": 8785
       },
       {
         "termino": "par",
-        "cf": 297725,
-        "df": 437
+        "cf": 297732,
+        "df": 456
       },
       {
         "termino": "as",
-        "cf": 276070,
-        "df": 6982
+        "cf": 297154,
+        "df": 7894
       },
       {
         "termino": "for",
-        "cf": 269795,
-        "df": 8114
+        "cf": 288043,
+        "df": 9019
       },
       {
         "termino": "this",
-        "cf": 243225,
-        "df": 6312
+        "cf": 257017,
+        "df": 7306
       },
       {
         "termino": "her",
-        "cf": 236403,
-        "df": 5012
+        "cf": 249818,
+        "df": 5670
       },
       {
         "termino": "at",
-        "cf": 218168,
-        "df": 6765
+        "cf": 228725,
+        "df": 7749
       }
     ],
     "configuracion": {
@@ -148,55 +150,62 @@
     "version_elasticsearch": "8.15.3",
     "indice": "rit_estandar",
     "total_documentos": 10000,
-    "documentos_es": 1941,
-    "documentos_en": 8059,
-    "tamano_vocabulario": 374196,
-    "vocabulario_es": 136699,
-    "vocabulario_en": 277726,
-    "total_postings": 8705413,
-    "total_tokens": 31079435,
-    "tamano_indice_bytes": 220834724,
-    "tamano_indice_mb": 210.6,
+    "documentos_es": 1095,
+    "documentos_en": 8905,
+    "tamano_vocabulario": 391981,
+    "vocabulario_es": 138630,
+    "vocabulario_en": 294478,
+    "total_postings": 9257278,
+    "total_tokens": 32302963,
+    "tamano_indice_bytes": 21297462,
+    "tamano_store_bytes": 648500306,
+    "tamano_recuperacion_bytes": 75027266,
+    "tamano_indice_mb": 20.31,
     "segmentos": 1,
     "documentos_borrados": 0,
-    "tiempo_segundos": 86.553,
+    "tiempo_segundos": 484.803,
     "tiempos_fases_segundos": {
-      "carga": 16.866,
-      "estadisticas": 52.177,
-      "normas": 15.807,
-      "compactacion": 1.611
+      "carga": 78.962,
+      "estadisticas": 306.279,
+      "normas": 87.885,
+      "compactacion": 11.296
     },
     "memoria_jvm": {
-      "heap_usado_mb": 539.41,
+      "heap_usado_mb": 703.26,
       "heap_maximo_mb": 1024
     },
-    "postings_por_termino_promedio": 23.26,
-    "bytes_por_documento_promedio": 22083.47,
+    "postings_por_termino_promedio": 23.62,
+    "bytes_por_documento_promedio": 2129.75,
     "terminos_mas_frecuentes": [
       {
         "termino": "par",
-        "cf": 298661,
-        "df": 647
+        "cf": 298676,
+        "df": 639
       },
       {
         "termino": "one",
-        "cf": 135900,
-        "df": 6542
+        "cf": 144515,
+        "df": 7447
       },
       {
         "termino": "get",
-        "cf": 123098,
-        "df": 4924
+        "cf": 127181,
+        "df": 5610
       },
       {
         "termino": "look",
-        "cf": 120624,
-        "df": 4352
+        "cf": 124006,
+        "df": 4989
       },
       {
         "termino": "tab",
-        "cf": 116623,
-        "df": 216
+        "cf": 116627,
+        "df": 224
+      },
+      {
+        "termino": "film",
+        "cf": 111892,
+        "df": 5254
       },
       {
         "termino": "fcs0",
@@ -220,8 +229,8 @@
       },
       {
         "termino": "pard",
-        "cf": 107264,
-        "df": 139
+        "cf": 107262,
+        "df": 138
       },
       {
         "termino": "itap0",
@@ -229,14 +238,9 @@
         "df": 96
       },
       {
-        "termino": "film",
-        "cf": 98951,
-        "df": 4830
-      },
-      {
         "termino": "back",
-        "cf": 98293,
-        "df": 4697
+        "cf": 100953,
+        "df": 5317
       },
       {
         "termino": "faaut",
@@ -249,29 +253,29 @@
         "df": 97
       },
       {
-        "termino": "go",
-        "cf": 86682,
-        "df": 5608
+        "termino": "like",
+        "cf": 92558,
+        "df": 5851
       },
       {
-        "termino": "like",
-        "cf": 85417,
-        "df": 5026
+        "termino": "go",
+        "cf": 90180,
+        "df": 6384
       },
       {
         "termino": "2026",
-        "cf": 82288,
-        "df": 4102
-      },
-      {
-        "termino": "see",
-        "cf": 81217,
-        "df": 4638
+        "cf": 90027,
+        "df": 4458
       },
       {
         "termino": "anim",
-        "cf": 80344,
-        "df": 4983
+        "cf": 85691,
+        "df": 5192
+      },
+      {
+        "termino": "see",
+        "cf": 84908,
+        "df": 5380
       }
     ],
     "configuracion": {
@@ -281,7 +285,8 @@
       "esquema_tf": "logaritmico",
       "esquema_idf": "estandar"
     },
-    "documentos_fallidos": []
+    "documentos_fallidos": [],
+    "tamano_nota": "La corrida del 25-11 capturó este tamaño a mitad de la fusión del forcemerge (store crudo en tamano_store_bytes, con recovery apenas restado). El neto se corrigió con la instantánea _disk_usage del índice ya reposado (descomposicion_disco.json): store 81554570 - _recovery_source 60257108. El resto de las métricas es el de esa corrida."
   },
   {
     "nombre_politica": "avanzado",
@@ -290,65 +295,67 @@
     "version_elasticsearch": "8.15.3",
     "indice": "rit_avanzado",
     "total_documentos": 10000,
-    "documentos_es": 1942,
-    "documentos_en": 8058,
-    "tamano_vocabulario": 353503,
-    "vocabulario_es": 126868,
-    "vocabulario_en": 264061,
-    "total_postings": 8521796,
-    "total_tokens": 31132662,
-    "tamano_indice_bytes": 394319876,
-    "tamano_indice_mb": 376.05,
+    "documentos_es": 1097,
+    "documentos_en": 8903,
+    "tamano_vocabulario": 368767,
+    "vocabulario_es": 127390,
+    "vocabulario_en": 279660,
+    "total_postings": 9071429,
+    "total_tokens": 32378326,
+    "tamano_indice_bytes": 20193161,
+    "tamano_store_bytes": 79661984,
+    "tamano_recuperacion_bytes": 405277,
+    "tamano_indice_mb": 19.26,
     "segmentos": 1,
     "documentos_borrados": 0,
-    "tiempo_segundos": 231.324,
+    "tiempo_segundos": 1129.834,
     "tiempos_fases_segundos": {
-      "carga": 53.252,
-      "estadisticas": 123.442,
-      "normas": 52.882,
-      "compactacion": 1.652
+      "carga": 233.83,
+      "estadisticas": 656.164,
+      "normas": 232.706,
+      "compactacion": 6.642
     },
     "memoria_jvm": {
-      "heap_usado_mb": 265.67,
+      "heap_usado_mb": 546.08,
       "heap_maximo_mb": 1024
     },
-    "postings_por_termino_promedio": 24.11,
-    "bytes_por_documento_promedio": 39431.99,
+    "postings_por_termino_promedio": 24.6,
+    "bytes_por_documento_promedio": 2019.32,
     "terminos_mas_frecuentes": [
       {
         "termino": "<NUM>",
-        "cf": 544402,
-        "df": 8953
+        "cf": 556619,
+        "df": 9093
       },
       {
         "termino": "par",
-        "cf": 298041,
-        "df": 561
+        "cf": 298043,
+        "df": 566
       },
       {
         "termino": "film",
-        "cf": 168857,
-        "df": 6183
+        "cf": 188738,
+        "df": 6662
       },
       {
         "termino": "one",
-        "cf": 135901,
-        "df": 6542
+        "cf": 144516,
+        "df": 7447
       },
       {
         "termino": "get",
-        "cf": 123099,
-        "df": 4925
+        "cf": 127182,
+        "df": 5611
       },
       {
         "termino": "look",
-        "cf": 120624,
-        "df": 4352
+        "cf": 124006,
+        "df": 4989
       },
       {
         "termino": "tab",
-        "cf": 116604,
-        "df": 210
+        "cf": 116608,
+        "df": 218
       },
       {
         "termino": "fcs0",
@@ -372,8 +379,8 @@
       },
       {
         "termino": "pard",
-        "cf": 107264,
-        "df": 139
+        "cf": 107262,
+        "df": 138
       },
       {
         "termino": "itap0",
@@ -382,8 +389,8 @@
       },
       {
         "termino": "back",
-        "cf": 98293,
-        "df": 4697
+        "cf": 100953,
+        "df": 5317
       },
       {
         "termino": "faaut",
@@ -396,24 +403,24 @@
         "df": 97
       },
       {
-        "termino": "<FECHA>",
-        "cf": 97329,
-        "df": 3484
+        "termino": "like",
+        "cf": 92559,
+        "df": 5851
       },
       {
         "termino": "go",
-        "cf": 86710,
-        "df": 5616
+        "cf": 90212,
+        "df": 6394
       },
       {
-        "termino": "like",
-        "cf": 85418,
-        "df": 5026
+        "termino": "<FECHA>",
+        "cf": 87914,
+        "df": 3268
       },
       {
-        "termino": "see",
-        "cf": 81218,
-        "df": 4638
+        "termino": "anim",
+        "cf": 86202,
+        "df": 5204
       }
     ],
     "configuracion": {
@@ -423,6 +430,7 @@
       "esquema_tf": "logaritmico",
       "esquema_idf": "estandar"
     },
-    "documentos_fallidos": []
+    "documentos_fallidos": [],
+    "tamano_nota": "El neto se corrigió con la instantánea _disk_usage del índice ya reposado (descomposicion_disco.json): store 53151218 - _recovery_source 32958057; la corrida anterior midió exactamente el mismo neto (20193161 bytes). En la corrida del 25-11 la lectura de _recovery_source devolvió 405277 bytes y el store quedó con la copia de recuperación sin descontar. El resto de las métricas es el de esa corrida."
   }
 ]

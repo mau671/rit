@@ -1,9 +1,10 @@
 """Pruebas de integración contra los índices reales almacenados en ``salida/``.
 
-Verifican que los tres archivos ``.idx`` versionados sigan siendo coherentes con
-su encabezado y que una consulta funcione igual de bien con cualquiera de las
-tres políticas de normalización, que es precisamente lo que se rompía cuando la
-consulta se normalizaba con una configuración fija.
+Verifican que los tres archivos ``.idx`` (que ``scripts/regenerar_todo.sh``
+deja en disco sin versionarlos) sigan siendo coherentes con su encabezado y que
+una consulta funcione igual de bien con cualquiera de las tres políticas de
+normalización, que es precisamente lo que se rompía cuando la consulta se
+normalizaba con una configuración fija.
 """
 
 from __future__ import annotations

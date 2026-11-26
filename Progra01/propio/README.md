@@ -13,7 +13,7 @@ uv sync
 uv run pytest
 uv run indexador benchmark --limite 10000     # construye y mide las 3 políticas
 uv run indexador inspeccionar salida/indice_estandar.idx --verificar
-uv run indexador buscar "guion pulp fiction" --politica estandar
+uv run indexador buscar salida/indice_estandar.idx "guion pulp fiction" --top 5
 ```
 
 El flujo completo (pruebas, índices, estadísticas del informe, comparación con

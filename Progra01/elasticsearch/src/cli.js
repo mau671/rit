@@ -2,11 +2,11 @@
 // cli.js
 // Punto de entrada del indexador con Elasticsearch.
 //
-//   node src/cli.js indexar     --config configuraciones/estandar.conf [--limite 500]
+//   node src/cli.js indexar     --config configuraciones/estandar.conf [--limite 10000]
 //   node src/cli.js generar     --config configuraciones/estandar.conf
 //   node src/cli.js verificar   --config configuraciones/estandar.conf [--casos ruta.json]
 //   node src/cli.js buscar      --config configuraciones/estandar.conf "film director" [--top 10]
-//   node src/cli.js benchmark   [--limite 500] [--propio ../salida/benchmark_indices.json]
+//   node src/cli.js benchmark   [--limite 10000] [--propio ../propio/salida/benchmark_indices.json]
 
 import { parseArgs } from "node:util";
 
@@ -39,7 +39,7 @@ Opciones:
   --limite, -l   Cantidad máxima de documentos (0 = todos)
   --top, -k      Resultados a mostrar en buscar (por defecto 10)
   --casos        Archivo de casos para verificar
-  --propio       Benchmark del propio (por defecto ../salida/benchmark_indices.json)
+  --propio       Benchmark del propio (por defecto ../propio/salida/benchmark_indices.json)
 `;
 
 const POLITICAS = ["configuraciones/minimo.conf", "configuraciones/estandar.conf", "configuraciones/avanzado.conf"];

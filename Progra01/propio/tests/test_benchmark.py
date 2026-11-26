@@ -69,8 +69,8 @@ def test_tabla_comparativa_incluye_cada_politica() -> None:
 
 def test_benchmark_sobre_coleccion_real(tmp_path: Path) -> None:
     """Indexa 5 documentos reales de Progra00 con la política mínima."""
-    ruta_bd = Path("../Progra00/almacenamiento/metadatos_araña.db")
-    ruta_repo = Path("../Progra00/almacenamiento/repositorio")
+    ruta_bd = Path("../../Progra00/almacenamiento/metadatos_araña.db")
+    ruta_repo = Path("../../Progra00/almacenamiento/repositorio")
     if not ruta_bd.is_file() or not ruta_repo.is_dir():
         pytest.skip("La colección de Progra00 no está disponible")
 

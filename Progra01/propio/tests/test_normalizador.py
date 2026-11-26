@@ -228,7 +228,7 @@ class TestColeccionReal:
 
     def test_fragmento_filmaffinity_real(self) -> None:
         ruta_filmaffinity = Path(
-            "../Progra00/almacenamiento/repositorio/filmaffinity.com/documentos/76/761cc92d43c07f4bb06cd51bd4f607ed88cceb1fa30d33b22859d483e63d4808.txt"
+            "../../Progra00/almacenamiento/repositorio/filmaffinity.com/documentos/76/761cc92d43c07f4bb06cd51bd4f607ed88cceb1fa30d33b22859d483e63d4808.txt"
         )
         if not ruta_filmaffinity.is_file():
             pytest.skip("Archivo de muestra de FilmAffinity no disponible")
@@ -249,7 +249,7 @@ class TestColeccionReal:
 
     def test_fragmento_imsdb_guion_real(self) -> None:
         ruta_imsdb = Path(
-            "../Progra00/almacenamiento/repositorio/imsdb.com/documentos/4f/4f33a1e015a5df181e5b9e2730d8730783e651cf4f7b8cad4aee8b5770c0f489.txt"
+            "../../Progra00/almacenamiento/repositorio/imsdb.com/documentos/4f/4f33a1e015a5df181e5b9e2730d8730783e651cf4f7b8cad4aee8b5770c0f489.txt"
         )
         if not ruta_imsdb.is_file():
             pytest.skip("Archivo de muestra de IMSDb no disponible")

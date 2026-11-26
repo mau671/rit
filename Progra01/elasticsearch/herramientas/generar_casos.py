@@ -7,12 +7,12 @@ Ejecuta el Normalizador del propio sobre textos de prueba y sobre una muestra
 de documentos reales de la colección, y guarda los tokens que produce. Luego
 `node src/cli.js verificar` envía los mismos textos a Elasticsearch y compara.
 
-Se corre desde la carpeta del propio (Progra01), con su entorno de uv:
+Se corre desde la carpeta del propio (Progra01/propio), con su entorno de uv:
 
-    cd ../  # carpeta Progra01
-    uv run python Progra01-ES/herramientas/generar_casos.py --politica estandar --muestras 30
+    cd ../propio  # si está en Progra01/elasticsearch
+    uv run python ../elasticsearch/herramientas/generar_casos.py --politica estandar --muestras 30
 
-Genera Progra01-ES/casos/esperados_<politica>.json
+Genera elasticsearch/casos/esperados_<politica>.json
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ import json
 import sys
 from pathlib import Path
 
-RAIZ_ES = Path(__file__).resolve().parent.parent  # Progra01-ES
-RAIZ_PROPIO = RAIZ_ES.parent  # Progra01
+RAIZ_ES = Path(__file__).resolve().parent.parent  # Progra01/elasticsearch
+RAIZ_PROPIO = RAIZ_ES.parent / "propio"  # Progra01/propio
 sys.path.insert(0, str(RAIZ_PROPIO / "src"))
 
 from importlib.metadata import PackageNotFoundError, version  # noqa: E402

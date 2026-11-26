@@ -1,13 +1,14 @@
 # Recursos y contrato de normalización
 
 Estos archivos son la **única fuente** de las listas de normalización: los lee el
-indexador propio (`src/indexador/normalizador.py`) y los debe leer el indexador de
-Lucene. Si una lista cambia, cambia para ambos, y `scripts/regenerar_todo.sh`
-reconstruye los índices.
+indexador propio (`src/indexador/normalizador.py`) y también el indexador con
+Elasticsearch (`../elasticsearch/`, mediante `recursos = ../recursos` en sus
+`.conf`). Si una lista cambia, cambia para ambos, y
+`scripts/regenerar_todo.sh` reconstruye los índices.
 
 | Archivo | Contenido | Formato |
 |---|---|---|
-| `stopwords_es.txt`, `stopwords_en.txt` | Palabras vacías | Una por línea, `#` comenta (lo que lee `WordlistLoader.getWordSet(reader, "#")` de Lucene) |
+| `stopwords_es.txt`, `stopwords_en.txt` | Palabras vacías | Una por línea, `#` comenta (formato clásico de las listas de palabras de Lucene) |
 | `sinonimos.txt` | Variantes de obras, formatos y técnica → descriptor | `v1, v2 => descriptor` (formato Solr) |
 | `tesauro.txt` | Oficios y créditos → descriptor | `v1, v2 => descriptor` (formato Solr) |
 
@@ -61,7 +62,7 @@ La consulta recibe exactamente el mismo pipeline que el documento.
 | `configuraciones/estandar.conf` | intermedia | + clíticos, stopwords ES+EN, Snowball |
 | `configuraciones/avanzado.conf` | agresiva | + fechas, números, plegado de tildes, sinónimos y tesauro |
 
-## Notas para el indexador de Lucene
+## Notas para el analyzer de Elasticsearch (componentes de Lucene)
 
 - Los pasos 2, 3, 6 y 7 se pueden hacer con `PatternReplaceCharFilter` / `PatternReplaceFilter`
   con las mismas expresiones (la sintaxis de Java acepta las de arriba tal cual).

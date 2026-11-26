@@ -10,34 +10,28 @@ LIMITE="${1:-10000}"
 
 cd "$PROPIO"
 
-echo "==> 1/6 pruebas y casos compartidos"
+echo "==> 1/5 pruebas y casos compartidos"
 uv run pytest -q
 uv run python scripts/verificar_casos.py
 
-echo "==> 2/6 índices y benchmark de las tres políticas ($LIMITE documentos)"
+echo "==> 2/5 índices y benchmark de las tres políticas ($LIMITE documentos)"
 uv run indexador benchmark --limite "$LIMITE"
 for p in minimo estandar avanzado; do
     uv run indexador inspeccionar "salida/indice_$p.idx" --verificar | tail -1
 done
 
-echo "==> 3/6 estadísticas (tablas/ y datos/)"
+echo "==> 3/5 estadísticas (tablas/ y datos/)"
 uv run python scripts/estadisticas_indices.py
 
-echo "==> 4/6 comparación con Elasticsearch"
+echo "==> 4/5 comparación con Elasticsearch"
 if [[ -f "$RAIZ/elasticsearch/salida/benchmark_elasticsearch.json" ]]; then
     uv run python scripts/comparativo_es.py
 else
     echo "    omitido: no hay elasticsearch/salida/benchmark_elasticsearch.json"
+    echo "    (la tabla comparativa del informe no se actualiza)"
 fi
 
-echo "==> 5/6 comparación genérica (solo si se define LUCENE_CMD)"
-if [[ -n "${LUCENE_CMD:-}" ]]; then
-    uv run python scripts/benchmark_comparativo.py --limite "$LIMITE" --repeticiones 3 --lucene-cmd "$LUCENE_CMD"
-else
-    echo "    omitido: exporte LUCENE_CMD con la plantilla del comando externo"
-fi
-
-echo "==> 6/6 informe"
+echo "==> 5/5 informe"
 if command -v tectonic >/dev/null; then
     (cd "$RAIZ" && tectonic Progra01.tex)
 else

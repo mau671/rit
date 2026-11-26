@@ -5,130 +5,132 @@
   "version_elasticsearch": "8.15.3",
   "indice": "rit_minimo",
   "total_documentos": 10000,
-  "documentos_es": 1941,
-  "documentos_en": 8059,
-  "tamano_vocabulario": 497160,
-  "vocabulario_es": 199154,
-  "vocabulario_en": 368138,
-  "total_postings": 11400365,
-  "total_tokens": 50682834,
-  "tamano_indice_bytes": 226322590,
-  "tamano_indice_mb": 215.84,
+  "documentos_es": 1095,
+  "documentos_en": 8905,
+  "tamano_vocabulario": 519119,
+  "vocabulario_es": 201343,
+  "vocabulario_en": 389301,
+  "total_postings": 12119321,
+  "total_tokens": 52853741,
+  "tamano_indice_bytes": 28984311,
+  "tamano_store_bytes": 217438187,
+  "tamano_recuperacion_bytes": 188453876,
+  "tamano_indice_mb": 27.64,
   "segmentos": 1,
   "documentos_borrados": 0,
-  "tiempo_segundos": 77.494,
+  "tiempo_segundos": 314.864,
   "tiempos_fases_segundos": {
-    "carga": 13.52,
-    "estadisticas": 49.3,
-    "normas": 11.946,
-    "compactacion": 2.647
+    "carga": 46.985,
+    "estadisticas": 199.627,
+    "normas": 59.645,
+    "compactacion": 8.316
   },
   "memoria_jvm": {
-    "heap_usado_mb": 764.37,
+    "heap_usado_mb": 768.04,
     "heap_maximo_mb": 1024
   },
-  "postings_por_termino_promedio": 22.93,
-  "bytes_por_documento_promedio": 22632.26,
+  "postings_por_termino_promedio": 23.35,
+  "bytes_por_documento_promedio": 2898.43,
   "terminos_mas_frecuentes": [
     {
       "termino": "the",
-      "cf": 2464824,
-      "df": 8890
+      "cf": 2616438,
+      "df": 9683
     },
     {
       "termino": "to",
-      "cf": 1042947,
-      "df": 8383
+      "cf": 1104198,
+      "df": 9268
     },
     {
       "termino": "and",
-      "cf": 999002,
-      "df": 8251
+      "cf": 1066246,
+      "df": 9148
     },
     {
       "termino": "of",
-      "cf": 938452,
-      "df": 8428
+      "cf": 1011311,
+      "df": 9292
     },
     {
       "termino": "in",
-      "cf": 719725,
-      "df": 8428
-    },
-    {
-      "termino": "de",
-      "cf": 489672,
-      "df": 4582
+      "cf": 765766,
+      "df": 9318
     },
     {
       "termino": "is",
-      "cf": 476367,
-      "df": 7331
+      "cf": 509611,
+      "df": 8312
+    },
+    {
+      "termino": "de",
+      "cf": 444627,
+      "df": 4110
     },
     {
       "termino": "you",
-      "cf": 373183,
-      "df": 6024
+      "cf": 381300,
+      "df": 6819
     },
     {
       "termino": "his",
-      "cf": 357265,
-      "df": 5737
+      "cf": 371955,
+      "df": 6590
     },
     {
       "termino": "on",
-      "cf": 345056,
-      "df": 7652
+      "cf": 362111,
+      "df": 8528
     },
     {
       "termino": "he",
-      "cf": 343939,
-      "df": 5327
+      "cf": 358711,
+      "df": 6156
     },
     {
       "termino": "it",
-      "cf": 331113,
-      "df": 6281
+      "cf": 350262,
+      "df": 7317
     },
     {
       "termino": "that",
-      "cf": 311579,
-      "df": 6669
+      "cf": 340951,
+      "df": 7676
     },
     {
       "termino": "with",
-      "cf": 307613,
-      "df": 7800
+      "cf": 327892,
+      "df": 8785
     },
     {
       "termino": "par",
-      "cf": 297725,
-      "df": 437
+      "cf": 297732,
+      "df": 456
     },
     {
       "termino": "as",
-      "cf": 276070,
-      "df": 6982
+      "cf": 297154,
+      "df": 7894
     },
     {
       "termino": "for",
-      "cf": 269795,
-      "df": 8114
+      "cf": 288043,
+      "df": 9019
     },
     {
       "termino": "this",
-      "cf": 243225,
-      "df": 6312
+      "cf": 257017,
+      "df": 7306
     },
     {
       "termino": "her",
-      "cf": 236403,
-      "df": 5012
+      "cf": 249818,
+      "df": 5670
     },
     {
       "termino": "at",
-      "cf": 218168,
-      "df": 6765
+      "cf": 228725,
+      "df": 7749
     }
   ],
   "configuracion": {

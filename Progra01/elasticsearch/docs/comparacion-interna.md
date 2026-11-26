@@ -2,7 +2,7 @@
 
 Base para la sección del documento que pide comparar el funcionamiento interno
 de ambos indexadores. Los números se completan con `salida/comparacion.md`
-después de correr `npm run benchmark -- --limite 500`.
+después de correr `npm run benchmark -- --limite 10000`.
 
 ## Construcción del índice
 

@@ -13,7 +13,10 @@ de stdout un JSON {"docs": N, "terminos": V, "postings": P}.
     uv run python scripts/benchmark_comparativo.py --limite 500 --repeticiones 3 \
         --lucene-cmd "java -jar ../lucene/target/indexador-lucene.jar indexar --config {config} --salida {salida} --limite {limite}"
 
-Resultados: salida/bench/comparativo.json y tablas/comparativo.tex (para el informe).
+Resultados: salida/bench/comparativo.json y tablas/comparativo_externo.tex.
+
+La tabla comparativa del informe (tablas/comparativo.tex) ya no la escribe este
+script: la genera scripts/comparativo_es.py con el benchmark de Elasticsearch.
 """
 
 from __future__ import annotations
@@ -148,7 +151,7 @@ def imprimir(rs: list[dict]) -> None:
 
 
 def escribir_tex(rs: list[dict]) -> None:
-    """Filas de tabla para \\input en el informe (tablas/comparativo.tex)."""
+    """Filas de tabla para \\input en tablas/comparativo_externo.tex (no el del informe)."""
     def n(x: object) -> str:
         return f"{x:,}".replace(",", r"\,") if isinstance(x, int) else "--"
 
@@ -159,7 +162,7 @@ def escribir_tex(rs: list[dict]) -> None:
     ]
     destino = RAIZ / "tablas"
     destino.mkdir(exist_ok=True)
-    (destino / "comparativo.tex").write_text("\n".join(filas) + "\n", encoding="utf-8")
+    (destino / "comparativo_externo.tex").write_text("\n".join(filas) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

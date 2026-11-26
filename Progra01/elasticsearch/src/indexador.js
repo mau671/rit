@@ -25,7 +25,7 @@ import { detectarIdioma } from "./idioma.js";
 import { cargarRecursos } from "./recursos.js";
 import { construirIndice, campoDeIdioma, CAMPO_ES, CAMPO_EN } from "./analizadores.js";
 import { pesoTf, idf } from "./similitud.js";
-import { crearCliente, verificarConexion, recrearIndice, estadisticasDisco, memoriaJvm } from "./elastic.js";
+import { crearCliente, verificarConexion, recrearIndice, estadisticasDisco, memoriaJvm, esperarCompactacion } from "./elastic.js";
 
 const segundos = (ms) => Math.round(ms) / 1000;
 const redondear = (x, d = 2) => Math.round(x * 10 ** d) / 10 ** d;
@@ -236,8 +236,11 @@ export async function indexar(config, { limite = 0 } = {}) {
   console.log("[4/4] Compactación (forcemerge) y medición");
   const t4 = performance.now();
   await cliente.indices.forcemerge({ index: indice, max_num_segments: 1 });
-  await cliente.indices.flush({ index: indice });
+  // Sin este refresh la vista de indices.stats sigue vacía (refresh_interval=-1)
+  // y esperarCompactacion daría por buena una fusión que aún no ocurrió.
   await cliente.indices.refresh({ index: indice });
+  await esperarCompactacion(cliente, indice);
+  await cliente.indices.flush({ index: indice });
   await cliente.indices.putSettings({ index: indice, settings: { refresh_interval: "1s" } });
   const tiempoCompactacion = performance.now() - t4;
   const tiempoTotal = performance.now() - inicio;
@@ -267,6 +270,8 @@ export async function indexar(config, { limite = 0 } = {}) {
     total_postings: est.totalPostings,
     total_tokens: totalTokens,
     tamano_indice_bytes: disco.tamano_bytes,
+    tamano_store_bytes: disco.tamano_store_bytes,
+    tamano_recuperacion_bytes: disco.tamano_recuperacion_bytes,
     tamano_indice_mb: redondear(disco.tamano_bytes / 1024 / 1024),
     segmentos: disco.segmentos,
     documentos_borrados: disco.documentos_borrados,

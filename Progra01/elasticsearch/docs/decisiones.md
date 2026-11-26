@@ -46,9 +46,8 @@ de las políticas:
   `[normalizacion]` y `[modelo]` se leen del `.conf` del propio.
 - Las stopwords, los sinónimos y el tesauro se leen de `Progra01/recursos/`,
   los mismos archivos que carga `normalizador.py`.
-- Las raíces fijas de los términos canónicos (`recursos/raices_fijas.txt` de
-  Progra01-ES) las escribe `herramientas/generar_casos.py` usando el stemmer
-  del propio.
+- Las raíces fijas de los términos canónicos (`elasticsearch/recursos/raices_fijas.txt`)
+  las escribe `herramientas/generar_casos.py` usando el stemmer del propio.
 
 Si el grupo cambia una política o una lista, basta volver a correr
 `generar_casos.py` y `verificar`.

@@ -250,7 +250,7 @@ Mauricio González Prendas & 2024143009 \\
 
 Este documento describe cómo se normaliza el texto antes de indexarlo y qué efecto tiene esa decisión sobre el índice. Una consulta solo encuentra un documento si ambos se reducen a los mismos términos; por eso la normalización define qué significa que dos palabras sean ``la misma'' y condiciona tanto el tamaño del índice como la calidad de los resultados~\cite{manning2008}.
 
-Se definieron tres configuraciones de normalización (mínima, intermedia y agresiva) y se construyó con cada una un índice sobre la misma muestra de la colección. La sección~\ref{sec:politicas} explica cada política y su justificación, la sección~\ref{sec:estadisticas} presenta las estadísticas medidas y la sección~\ref{sec:estructura-binaria} describe el formato binario del archivo. Las listas de palabras vacías, sinónimos y tesauro viven en \texttt{recursos/} y las leen por igual el indexador propio y el de Lucene; los casos de prueba compartidos están en \texttt{casos\_prueba/normalizacion.json}.
+Se definieron tres configuraciones de normalización (mínima, intermedia y agresiva) y se construyó con cada una un índice sobre la misma muestra de la colección. La sección~\ref{sec:politicas} explica cada política y su justificación, la sección~\ref{sec:estadisticas} presenta las estadísticas medidas y la sección~\ref{sec:estructura-binaria} describe el formato binario del archivo. Las listas de palabras vacías, sinónimos y tesauro viven en \texttt{recursos/} y las leen por igual el indexador propio y el de Elasticsearch, cuya normalización se declara con los componentes de análisis de Lucene (cada shard de un índice de Elasticsearch es un índice de Lucene); los casos de prueba compartidos están en \texttt{casos\_prueba/normalizacion.json}.
 
 % =========================================================
 % SECCIÓN 2: POLÍTICAS DE NORMALIZACIÓN
@@ -265,56 +265,56 @@ Cada política responde a tres preguntas: qué se hace, por qué, y dónde se ap
 
 \textbf{Justificación.} NFKC convierte ligaduras y caracteres de ancho completo a su forma ordinaria, de modo que cadenas que se ven igual quedan con la misma representación binaria~\cite{unicode15}. Partir \textit{sci-fi} en dos tokens perdería el término que el usuario escribe, porque ninguna de las dos mitades significa lo mismo que la palabra completa.
 
-\textbf{Dónde.} Propio: \texttt{normalizador.py}, paso de limpieza y \texttt{RE\_TOKEN}. Lucene: \texttt{PatternReplaceCharFilter} para las comillas y un \texttt{PatternTokenizer} con la misma expresión (la sintaxis de Java la acepta sin cambios).
+\textbf{Dónde.} Propio: \texttt{normalizador.py}, paso de limpieza y \texttt{RE\_TOKEN}. Elasticsearch: \texttt{PatternReplaceCharFilter} para las comillas y un \texttt{PatternTokenizer} con la misma expresión (la sintaxis de Java la acepta sin cambios).
 
 \subsection{Minúsculas (P2)}
 \textbf{Descripción.} Todo token alfanumérico pasa a minúsculas; los marcadores \texttt{<...>} no se tocan.
 
 \textbf{Justificación.} \textit{Cinema}, \textit{CINEMA} y \textit{cinema} deben ser una sola entrada del diccionario; distinguirlas solo dispersaría los postings~\cite{manning2008}. El costo es que se pierde la diferencia entre un nombre propio y una palabra común (\textit{Hook} frente a \textit{hook}), pérdida que se asume porque la colección es de texto libre con capitalización irregular.
 
-\textbf{Dónde.} Propio: \texttt{str.lower}. Lucene: \texttt{LowerCaseFilter}.
+\textbf{Dónde.} Propio: \texttt{str.lower}. Elasticsearch: \texttt{LowerCaseFilter}.
 
 \subsection{Palabras vacías (P3)}
 \textbf{Descripción.} Se descartan los tokens que aparecen en \texttt{recursos/stopwords\_es.txt} o \texttt{stopwords\_en.txt} (una palabra por línea; \texttt{\#} inicia un comentario). Del inglés también se quitan las contracciones (\textit{'s, 're, 've, 'll, 'd, 'm}) y las formas \textit{n't}, de modo que \textit{it's} produce \textit{it} y este se descarta como vacía. Las dos listas se aplican a todo documento, sin importar su idioma, porque la colección mezcla español e inglés dentro de un mismo texto.
 
 \textbf{Justificación.} Las palabras de altísima frecuencia ocupan las listas de postings más largas y casi no discriminan entre documentos; con ponderación $tf\text{-}idf$ su peso ya es cercano a cero~\cite{salton1988}. Quitarlas reduce el índice a costa de impedir consultas que sean solo de palabras vacías, lo que en este dominio no tiene valor. Se evitaron entradas ambiguas con el dominio: por ejemplo, no se incluyó \textit{star} porque forma parte de \textit{Star Wars}.
 
-\textbf{Dónde.} Propio: \texttt{cargar\_lista\_palabras}. Lucene: \texttt{WordlistLoader.getWordSet(reader, "\#")} con \texttt{StopFilter}~\cite{lucene-wordlist}.
+\textbf{Dónde.} Propio: \texttt{cargar\_lista\_palabras}. Elasticsearch: el filtro \texttt{stop} con la misma lista~\cite{es-stopfilter}.
 
 \subsection{Reducción morfológica (P4)}
 \textbf{Descripción.} Se aplica el algoritmo Snowball del idioma del documento. El idioma se decide contando, entre los primeros 300 tokens, cuántos están en cada lista de palabras vacías; gana el inglés solo si supera estrictamente al español, y un empate o la ausencia de votos da español. Un documento usa un único stemmer.
 
 \textbf{Justificación.} La reducción unifica formas flexivas (\textit{movies}, \textit{movie}) y mejora la cobertura, pero es una heurística: Porter muestra que se trata de quitar sufijos con reglas, no de hallar la forma de diccionario~\cite{porter1980,porter2001}. Por eso en este documento se habla de \textbf{stemming}, no de lematización. Los resultados empíricos de Harman muestran que reducir sufijos no mejora de forma consistente la recuperación en colecciones pequeñas~\cite{harman1991}, así que la política mínima se conserva como línea base para medir el efecto real sobre esta colección.
 
-\textbf{Dónde.} Propio: \texttt{snowballstemmer} con memoria de las raíces ya calculadas. Lucene: \texttt{SnowballFilter} con el mismo idioma; otros stemmers, como \texttt{PorterStemFilter}, no son equivalentes y no deben usarse.
+\textbf{Dónde.} Propio: \texttt{snowballstemmer} con memoria de las raíces ya calculadas. Elasticsearch: el filtro \texttt{snowball} (\texttt{SnowballFilter}) con el mismo idioma; otros stemmers, como \texttt{PorterStemFilter}, no son equivalentes y no deben usarse.
 
 \subsection{Tildes y la letra eñe (P5)}
 \textbf{Descripción.} En la política agresiva se pliegan las tildes y diéresis (\textit{película} $\to$ \textit{pelicula}), pero la \textit{ñ} se conserva: \textit{año} y \textit{ano} siguen siendo distintas.
 
 \textbf{Justificación.} Quien busca sin tildes debe encontrar texto con tildes. En cambio \textit{año}/\textit{ano} son palabras distintas y colapsarlas crea ruido real. Plegar solo las tildes de las vocales es la excepción que evita ese error.
 
-\textbf{Dónde.} Propio: \texttt{remover\_diacriticos}. Lucene: un \texttt{MappingCharFilter} propio; \texttt{ASCIIFoldingFilter} no sirve tal cual porque también convierte \textit{ñ} en \textit{n}.
+\textbf{Dónde.} Propio: \texttt{remover\_diacriticos}. Elasticsearch: un \texttt{icu\_transform} entre dos \texttt{PatternReplaceCharFilter} que protegen y restauran la \textit{ñ}; \texttt{ASCIIFoldingFilter} no sirve tal cual porque también convierte \textit{ñ} en \textit{n}.
 
 \subsection{Fechas (P6)}
 \textbf{Descripción.} En la política agresiva, cada fecha completa (\texttt{25/12/1977}, \texttt{1977-12-25}, \textit{25 de diciembre de 1977}, \textit{December 25, 1977}) se sustituye por \texttt{<FECHA>}. Un año suelto entre 1888 y 2099 se sustituye por \texttt{<ANIO\_aaaa>}, de modo que el año de estreno sigue siendo buscable.
 
 \textbf{Justificación.} Una fecha completa casi nunca se busca tal cual, pero ocupa un término distinto por cada día del calendario; el año sí es una consulta frecuente (\textit{1994}). El rango 1888--2099 acota los años plausibles para una obra audiovisual y evita convertir en año cualquier número de cuatro cifras.
 
-\textbf{Dónde.} Propio: \texttt{RE\_FECHA\_TEXTUAL} y las expresiones numéricas. Lucene: \texttt{PatternReplaceCharFilter} con las mismas expresiones.
+\textbf{Dónde.} Propio: \texttt{RE\_FECHA\_TEXTUAL} y las expresiones numéricas. Elasticsearch: \texttt{PatternReplaceCharFilter} con las mismas expresiones.
 
 \subsection{Números (P7)}
 \textbf{Descripción.} Un número (\texttt{\textbackslash d+([.,]\textbackslash d+)?}) se puede conservar, descartar o reemplazar por \texttt{<NUM>}; la política agresiva usa \texttt{<NUM>}. Los años y las fechas ya se trataron en P6 y no llegan a este paso.
 
 \textbf{Justificación.} Los números de la colección (duraciones, puntajes, minutos, versiones) casi no sirven como consulta, pero llenan el vocabulario con términos únicos. Con \texttt{<NUM>} se conserva la información de que hubo un número sin pagar un término por cada valor.
 
-\textbf{Dónde.} Propio: \texttt{RE\_NUMERO}. Lucene: \texttt{PatternReplaceCharFilter}.
+\textbf{Dónde.} Propio: \texttt{RE\_NUMERO}. Elasticsearch: \texttt{PatternReplaceCharFilter}.
 
 \subsection{Sinónimos y tesauro (P8)}
 \textbf{Descripción.} Dos archivos con el mismo formato (\texttt{variante, variante => descriptor}) llevan variantes a un solo descriptor. \texttt{sinonimos.txt} cubre equivalencias de obras, formatos y técnica (\textit{película, movie, cine, filme} $\to$ \texttt{film}; \textit{guion, script} $\to$ \texttt{screenplay}; \textit{soundtrack, ost} $\to$ \texttt{banda\_sonora}). \texttt{tesauro.txt} cubre oficios y créditos (\textit{director, cineasta, filmmaker} $\to$ \texttt{realizador}; \textit{actor, actriz, intérprete} $\to$ \texttt{interprete}). Solo se mapean tokens sueltos y, si una variante está en ambos archivos, gana el tesauro. Los descriptores se reducen con el stemmer de su propio idioma, para que \texttt{film} y \texttt{realizador} den el mismo término en cualquier documento.
 
 \textbf{Justificación.} Un tesauro es un vocabulario controlado: un descriptor preferido y términos no preferidos que remiten a él~\cite{iso25964}. Aplicarlo al indexar y al consultar permite que una consulta en español encuentre un documento en inglés. Los resultados de expansión léxica con WordNet fueron pobres cuando se aplicó a ciegas~\cite{voorhees1994}; por eso las listas son cortas, escritas a mano y solo incluyen variantes que significan lo mismo en el dominio. Se excluyeron las ambiguas: \textit{star} (Star Wars), \textit{score} (puntaje), \textit{short}, \textit{feature}, \textit{editor}, \textit{composer} y \textit{protagonista}.
 
-\textbf{Dónde.} Propio: \texttt{cargar\_sinonimos}. Lucene: \texttt{SolrSynonymParser} para ambos archivos~\cite{lucene-solrsyn} con \texttt{SynonymGraphFilter}, usado como reemplazo (\texttt{expand=false}).
+\textbf{Dónde.} Propio: \texttt{cargar\_sinonimos}. Elasticsearch: el filtro \texttt{synonym} con las reglas \texttt{variante => descriptor} de ambos archivos; una regla con flecha reemplaza la variante en vez de expandirla con todos sus sinónimos.
 
 \subsection{Nombres propios (P9)}
 \textbf{Descripción.} No se hace reconocimiento de entidades. Un nombre propio recibe el mismo trato que cualquier otro token: minúsculas, tildes (según la política) y, con stemming, reducción. \textit{George Lucas} produce \texttt{georg luca}.
@@ -363,7 +363,7 @@ La Tabla~\ref{tab:politicas} resume qué activa cada configuración. Cada una es
 \end{itemize}
 
 \subsection{Casos de prueba compartidos}
-El archivo \texttt{casos\_prueba/normalizacion.json} contiene 28 casos ``texto $\to$ tokens esperados'', cada uno con el resultado esperado para las tres políticas, agrupados por tema (tokenización, palabras vacías, fechas, tesauro, tildes, stemming, nombres, números, casos de borde e integración). Cualquiera de los dos indexadores debe producir exactamente esos tokens. El indexador propio los verifica con \texttt{uv run python scripts/verificar\_casos.py}; el de Lucene se verifica con la misma herramienta y la opción \texttt{--comando}, que ejecuta un programa externo por caso. El contrato completo de pasos y su orden está en \texttt{recursos/README.md}.
+El archivo \texttt{casos\_prueba/normalizacion.json} contiene 28 casos ``texto $\to$ tokens esperados'', cada uno con el resultado esperado para las tres políticas, agrupados por tema (tokenización, palabras vacías, fechas, tesauro, tildes, stemming, nombres, números, casos de borde e integración). Cualquiera de los dos indexadores debe producir exactamente esos tokens. El propio los verifica con \texttt{uv run python scripts/verificar\_casos.py}; Elasticsearch se verifica en sentido inverso: \texttt{elasticsearch/herramientas/generar\_casos.py} corre el normalizador del propio sobre los textos de prueba y una muestra de la colección para escribir los tokens esperados (y las raíces fijas de los términos canónicos), y \texttt{node src/cli.js verificar} los compara contra lo que produce el \emph{analyzer} de cada política. El contrato completo de pasos y su orden está en \texttt{recursos/README.md}.
 
 % =========================================================
 % SECCIÓN 3: ESTADÍSTICAS
@@ -375,9 +375,9 @@ Las cifras de esta sección salen de scripts, no de valores escritos a mano: \te
 
 \IfFileExists{tablas/vigencia.tex}{\input{tablas/vigencia.tex}\AvisoCifras}{}
 
-Las tres configuraciones se construyeron sobre los mismos 500 primeros documentos de la colección, con el procedimiento de evaluación automatizado:
+Las tres configuraciones se construyeron sobre los mismos 10 000 primeros documentos de la colección, con el procedimiento de evaluación automatizado:
 \begin{lstlisting}[language=bash, caption={Ejecución comparativa de las tres políticas de indexación.}]
-uv run indexador benchmark --limite 500
+uv run indexador benchmark --limite 10000
 \end{lstlisting}
 La memoria de cada política se mide con la marca de agua alta del proceso (\texttt{VmHWM}), que se reinicia antes de cada ejecución; de lo contrario la segunda y la tercera política heredarían el pico de la primera.
 
@@ -386,7 +386,7 @@ La memoria de cada política se mide con la marca de agua alta del proceso (\tex
 \begin{table}[htbp]
   \centering
   \footnotesize
-  \caption{Comparativa cuantitativa de los tres índices (500 documentos).}
+  \caption{Comparativa cuantitativa de los tres índices (10 000 documentos).}
   \label{tab:benchmark-indices}
   \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrr@{}}
     \toprule
@@ -469,7 +469,7 @@ Lo que muestran las tablas:
 \end{figure}
 }{}
 
-\textbf{Frecuencia de documento.} La Tabla~\ref{tab:topdf} lista los diez términos que aparecen en más documentos. En la política mínima son palabras vacías; en las otras dos son palabras de contenido muy generales (\textit{film}, \textit{part}, \textit{new}), y con la agresiva aparece \texttt{<NUM>}, que condensa todos los números en un solo término.
+\textbf{Frecuencia de documento.} La Tabla~\ref{tab:topdf} lista los diez términos que aparecen en más documentos. En la política mínima son palabras vacías; en las otras dos son palabras de contenido muy generales (\textit{one}, \textit{new}, \textit{first}), y con la agresiva aparece \texttt{<NUM>}, que condensa todos los números en un solo término.
 
 \begin{table}[htbp]
   \centering
@@ -501,7 +501,7 @@ Lo que muestran las tablas:
 \end{figure}
 }{}
 
-Cerca de la mitad del vocabulario tiene $df=1$ (Tabla~\ref{tab:benchmark-indices}). Esos términos (erratas, nombres propios raros, identificadores) casi nunca se buscan y alargan el diccionario; una política que los eliminara tendría que decidir cuáles son ruido, algo que no se hizo.
+Más de la mitad del vocabulario tiene $df=1$ (Tabla~\ref{tab:benchmark-indices}). Esos términos (erratas, nombres propios raros, identificadores) casi nunca se buscan y alargan el diccionario; una política que los eliminara tendría que decidir cuáles son ruido, algo que no se hizo.
 
 \subsection{Tamaño por sección del archivo}
 
@@ -553,34 +553,39 @@ La Tabla~\ref{tab:consultas} cuenta los documentos que devuelve cada política p
   \end{tabular*}
 \end{table}
 
-Estas cifras cuentan documentos que contienen \emph{algún} término de la consulta, no resultados relevantes: miden cobertura, no precisión, y no hay juicios de relevancia con los que medir esta última. Aun así se ven efectos claros. Con la agresiva, \textit{película} y \textit{movie} se unifican en \texttt{film} y devuelven el mismo conjunto en ambos idiomas; \textit{director} y \textit{cineasta} también convergen. En cambio \textit{Star Wars} devuelve muchos más documentos con la intermedia que con la mínima porque el stemmer une \textit{star} y \textit{stars}, y la consulta de un año (\textit{1994}) se vuelve \texttt{<ANIO\_1994>}, pero con la agresiva baja de 38 a 27 documentos: un año que aparece dentro de una fecha completa se reemplaza junto con ella por \texttt{<FECHA>} y deja de ser buscable.
+Estas cifras cuentan documentos que contienen \emph{algún} término de la consulta, no resultados relevantes: miden cobertura, no precisión, y no hay juicios de relevancia con los que medir esta última. Aun así se ven efectos claros. Con la agresiva, \textit{película} y \textit{movie} se unifican en \texttt{film} y devuelven el mismo conjunto en ambos idiomas; \textit{director} y \textit{cineasta} también convergen. En cambio \textit{Star Wars} devuelve muchos más documentos con la intermedia que con la mínima porque el stemmer une \textit{star} y \textit{stars}, y la consulta de un año (\textit{1994}) se vuelve \texttt{<ANIO\_1994>}, pero con la agresiva baja de 939 a 919 documentos: un año que aparece dentro de una fecha completa se reemplaza junto con ella por \texttt{<FECHA>} y deja de ser buscable.
 
-\subsection{Comparación entre el indexador propio y el de Lucene}
+\subsection{Comparación entre el indexador propio y Elasticsearch}
 
-El script \texttt{scripts/benchmark\_comparativo.py} ejecuta ambos indexadores como procesos externos con las mismas tres configuraciones y la misma muestra, y mide cada uno con \texttt{RUSAGE\_CHILDREN} desde un proceso intermedio. Así Python y la JVM se miden de la misma manera: tiempo de pared, tiempo de CPU, memoria residente máxima, tamaño del índice, términos y postings.
+La segunda implementación del índice, autorizada por el profesor, usa Elasticsearch 8.15 en lugar de Lucene directo: cada shard de un índice de Elasticsearch es un índice de Lucene y el análisis de texto lo hacen las mismas clases, de modo que la comparación sigue siendo contra Lucene, ahora envuelto en un servicio con su JVM, su API y sus estructuras por documento. El programa de Node.js que vive en \texttt{elasticsearch/} no normaliza nada: lee la misma colección, decide el idioma de cada documento (un \emph{analyzer} no puede elegir stemmer según el documento) y envía el texto por \emph{bulk}; toda la normalización la declara un \emph{analyzer} por política construido con los componentes de Lucene y las mismas listas de \texttt{recursos/}. El índice se crea con un shard y sin réplicas, de modo que quede exactamente un índice de Lucene que comparar con el archivo \texttt{.idx} monolítico; como el propio, guarda el texto sin posiciones (\texttt{index\_options = freqs}) y sin copia del contenido (\texttt{\_source} excluye los campos analizados).
 
-\IfFileExists{tablas/comparativo.tex}{%
+Las cifras de la Tabla~\ref{tab:comparativo} salen de dos artefactos medidos por separado con el mismo límite de documentos y en la misma máquina: \texttt{propio/salida/benchmark\_indices.json}, que produce \texttt{uv run indexador benchmark}, y \texttt{elasticsearch/salida/benchmark\_elasticsearch.json}, que produce \texttt{npm run benchmark}. Los lee \texttt{scripts/comparativo\_es.py} y escribe las filas de la tabla, sin nada escrito a mano; la única corrección es la del tamaño de las políticas intermedia y agresiva, que esa corrida capturó a mitad de una fusión de segmentos, y quedó reemplazado por una instantánea del índice ya reposado, documentada en el campo \texttt{tamano\_nota} del propio JSON.
+
 \begin{table}[htbp]
   \centering
   \footnotesize
-  \caption{Indexador propio frente a Lucene.}
+  \caption{Indexador propio frente a Elasticsearch sobre la misma muestra de 10 000 documentos.}
   \label{tab:comparativo}
-  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llrrrrrr@{}}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lrrr@{}}
     \toprule
-    \textbf{Impl.} & \textbf{Política} & \textbf{Pared (s)} & \textbf{CPU (s)} & \textbf{RAM (MB)} & \textbf{Tam. (MB)} & \textbf{Términos} & \textbf{Postings} \\
+    \textbf{Métrica} & \textbf{Propio} & \textbf{Elasticsearch} & \textbf{ES/propio} \\
     \midrule
     \filas{tablas/comparativo.tex}
     \bottomrule
   \end{tabular*}
 \end{table}
-}{%
-\noindent\fbox{\parbox{0.94\linewidth}{\small \textbf{Pendiente.} La comparación con Lucene aún no tiene cifras: falta el indexador de Lucene. Cuando exista, se mide con \texttt{scripts/regenerar\_todo.sh} definiendo la variable \texttt{LUCENE\_CMD}, y esta tabla aparece sola.}}
-}
+
+Lo que muestra la tabla:
+\begin{itemize}
+  \item \textbf{La normalización es equivalente.} El número de tokens indexados es idéntico en las tres políticas ($52\,853\,741$, $32\,302\,963$ y $32\,378\,326$), y con la política mínima, que no reduce nada, también lo son el vocabulario y los postings ($519\,119$ términos y $12\,119\,321$ postings en las dos implementaciones). Con la intermedia y la agresiva el vocabulario difiere en 80 y 893 términos (menos del 0,25\,\%) y los postings en menos del 0,06\,\%: es el único efecto de que Lucene traiga los algoritmos de Snowball 2.x mientras la biblioteca del propio es la 3.1, que reduce algunas formas distinto (\textit{universal} queda \texttt{univers} en Lucene y \texttt{universal} en el propio). La verificación token por token que guarda \texttt{elasticsearch/salida/verificacion\_*.json} coincide en los diez textos de prueba y solo falla, en las políticas con stemming, en documentos reales que contienen esas palabras.
+  \item \textbf{El formato comprimido de Lucene ocupa entre 5,6 y 6 veces menos que el archivo propio.} Elasticsearch mide 27,64, 20,31 y 19,26 MB frente a 154,37, 117,65 y 114,76 MB del propio. La diferencia es de diseño: Lucene guarda los postings como diferencias entre documentos consecutivos, comprimidas con \emph{frame of reference} (entre 1,8 y 2,0 bytes por ocurrencia en esta colección, diccionario incluido), y agrupa el diccionario en bloques con prefijos compartidos, mientras que el propio paga 12 bytes fijos por posting sin compresión, que es el precio de un archivo inspeccionable byte a byte con \texttt{hexdump}. El tamaño se midió con la API \texttt{\_disk\_usage} sobre el índice reposado y descuenta \texttt{\_recovery\_source}, la copia interna del documento original que Elasticsearch 8 guarda mientras \texttt{\_source} está filtrado y que expira sola: sin ese descuento el \emph{store} reporta hasta 237 MB, casi todo copia de respaldo y no índice. El desglose está en \texttt{elasticsearch/salida/descomposicion\_disco.json}: con la mínima, 24,3 MB de índice invertido, 2,4 de \texttt{\_source} con metadatos y 1,7 de \emph{doc values}.
+  \item \textbf{El tiempo le cuesta más a Elasticsearch, y el cociente crece con la política.} Elasticsearch tardó 1,84, 2,19 y 2,84 veces lo del propio (314,86, 484,80 y $1\,129,83$ s contra 170,94, 221,01 y 398,28), medidos ambos en la misma máquina (\MedicionMeta; Elasticsearch en Docker con un heap de 1 GB), así que los tiempos absolutos no son comparables con otras máquinas pero los cocientes sí. La fase dominante del lado de Elasticsearch es la de estadísticas (199,63, 306,28 y 656,16 s): para calcular $tf$, $df$ y las normas vuelve a analizar los diez mil documentos con \emph{mtermvectors}, mientras que el propio acumula esas cifras en su única pasada SPIMI; encima paga HTTP y JSON por documento, y el guardado de normas reenvía la colección completa. Con la agresiva el cociente sube porque sus seis \emph{char filters} de expresiones regulares corren sobre el texto completo en cada pasada (la fase de carga pasa de 78,96 a 233,83 s). La memoria tampoco es directamente comparable: el propio reporta el pico de RSS del proceso (279 a 303 MB) y Elasticsearch el heap usado de su JVM (546 a 768 MB de 1024 configurados).
+\end{itemize}
 
 \subsection{Composición de la muestra y razón texto-índice}
 
 \IfFileExists{tablas/dominios.tex}{%
-La muestra de 500 documentos reparte su texto de forma muy desigual entre los dominios de origen (Tabla~\ref{tab:dominios}). Los guiones de \texttt{dailyscript.com} son solo el $16{,}4\,\%$ de los documentos, pero aportan más de la mitad del texto, mientras que \texttt{filmaffinity.com} y \texttt{tvmaze.com} contribuyen con fichas muy cortas.
+La muestra de 10 000 documentos reparte su texto de forma muy desigual entre los dominios de origen (Tabla~\ref{tab:dominios}). Los guiones de \texttt{dailyscript.com} y \texttt{simplyscripts.com} son apenas un quinto de los documentos (7,6\,\% y 13,2\,\%) pero aportan casi la mitad del texto, mientras que \texttt{tvmaze.com} y \texttt{filmaffinity.com} contribuyen con fichas muy cortas y son el 3,2\,\% y el 0,9\,\% de la muestra.
 
 \begin{table}[htbp]
   \centering
@@ -598,7 +603,7 @@ La muestra de 500 documentos reparte su texto de forma muy desigual entre los do
 }{}
 
 \IfFileExists{tablas/razon_texto.tex}{%
-La Tabla~\ref{tab:razon-texto} compara el tamaño de cada índice con el texto del que sale. Incluso la política mínima, que conserva todas las palabras, ocupa poco más de la mitad del texto original, porque el índice guarda cada término una sola vez y solo un registro de doce bytes por par término-documento. Las políticas intermedia y agresiva lo bajan a cerca del $41\,\%$ y el $40\,\%$.
+La Tabla~\ref{tab:razon-texto} compara el tamaño de cada índice con el texto del que sale. Incluso la política mínima, que conserva todas las palabras, ocupa cerca de la mitad del texto original, porque el índice guarda cada término una sola vez y solo un registro de doce bytes por par término-documento. Las políticas intermedia y agresiva lo bajan a cerca del 38\,\% y el 37\,\%.
 
 \begin{table}[htbp]
   \centering
@@ -617,7 +622,7 @@ La Tabla~\ref{tab:razon-texto} compara el tamaño de cada índice con el texto d
 
 \subsection{Escala de la colección}
 
-Una prueba de escalado sobre veinte mil documentos de la misma colección confirmó que el esquema se sostiene fuera de la muestra: el índice se construyó en $160{,}8$ segundos con $539\,511$ términos y $13\,637\,739$ ocurrencias, un archivo de $172{,}6$ MB y un pico de $552$ MB de memoria residente, lo que proyecta alrededor de una hora y $3{,}7$ GB para los $317\,657$ documentos de la colección ($5{,}10$ GiB de texto). Esa medición motiva que el límite de memoria de SPIMI se evalúe contra el consumo real del proceso y no contra un número fijo de documentos.
+La muestra medida es el 3,2\,\% de la colección completa: 10 000 de los 317 657 documentos, que suman $5{,}10$ GiB de texto. Una proyección lineal de la Tabla~\ref{tab:benchmark-indices} a toda la colección da del orden de 90 minutos para la mínima, 117 para la intermedia y 211 (tres horas y media) para la agresiva, con archivos de entre 3,6 y 4,9 GB; es una extrapolación, no una medición, pero marca el orden de magnitud de indexar el corpus completo. En cambio la memoria no crece con la colección: el pico medido en las tres políticas (279 a 303 MB) refleja que el particionamiento de SPIMI se decide comparando la memoria residente real contra el límite del archivo de configuración y no un número fijo de documentos, así que indexar la colección completa exige disco y paciencia, no más RAM.
 
 
 % =========================================================
@@ -678,17 +683,17 @@ La arquitectura del formato se fundamenta en dos principios rectores:
 
     % Fila 2 de la cabecera (36 bytes): tres offsets y el modelo de ponderación
     \node[cell, minimum width=2.622cm] at (1.411, -0.65) {Offset documentos\\ \tiny\color{black!70} 8 bytes · \texttt{0x00000040}};
-    \node[cell, minimum width=2.622cm] at (4.153, -0.65) {Offset diccionario\\ \tiny\color{black!70} 8 bytes · \texttt{0x00005630}};
-    \node[cell, minimum width=2.622cm] at (6.895, -0.65) {Offset postings\\ \tiny\color{black!70} 8 bytes · \texttt{0x001B2423}};
+    \node[cell, minimum width=2.622cm] at (4.153, -0.65) {Offset diccionario\\ \tiny\color{black!70} 8 bytes · \texttt{0x0006B700}};
+    \node[cell, minimum width=2.622cm] at (6.895, -0.65) {Offset postings\\ \tiny\color{black!70} 8 bytes · \texttt{0x00BAFEE9}};
     \node[cell, minimum width=3.933cm] at (10.2925, -0.65) {Modelo $tf$/$idf$ y banderas\\ \tiny\color{black!70} 12 bytes · \texttt{0x00}};
 
     % -----------------------------------------------------------
-    % Sección 2: Tabla de documentos (500 docs x 44 bytes)
+    % Sección 2: Tabla de documentos (10 000 docs x 44 bytes)
     % -----------------------------------------------------------
     \node[secnum, color=green!55!black] at (0, -2.07) {Sección 2};
     \node[secnode, fill=green!8, minimum width=12.6cm, minimum height=2.1cm] (s2) at (6.3, -3.15) {};
     \node[anchor=west, font=\bfseries\footnotesize] at (0.35, -2.5) {Tabla de documentos y normas vectoriales};
-    \node[anchor=east, font=\scriptsize\color{black!60}] at (12.25, -2.5) {500 registros · 44 bytes cada uno};
+    \node[anchor=east, font=\scriptsize\color{black!60}] at (12.25, -2.5) {10 000 registros · 44 bytes cada uno};
     
     % 4 celdas con separación fija de 2 mm
     \node[cell, minimum width=2.20cm] at (1.40, -3.45) {\texttt{doc\_id}\\ \tiny\color{black!70} 4 bytes};
@@ -697,12 +702,12 @@ La arquitectura del formato se fundamenta en dos principios rectores:
     \node[cell, minimum width=2.30cm] at (11.15, -3.45) {Norma $\|d\|_2$\\ \tiny\color{black!70} 4 bytes · IEEE 754};
 
     % -----------------------------------------------------------
-    % Sección 3: Diccionario (59 224 términos)
+    % Sección 3: Diccionario (391 901 términos)
     % -----------------------------------------------------------
     \node[secnum, color=orange!70!black] at (0, -4.77) {Sección 3};
     \node[secnode, fill=orange!8, minimum width=12.6cm, minimum height=2.1cm] (s3) at (6.3, -5.85) {};
     \node[anchor=west, font=\bfseries\footnotesize] at (0.35, -5.2) {Diccionario de términos};
-    \node[anchor=east, font=\scriptsize\color{black!60}] at (12.25, -5.2) {$60\,672$ términos en orden alfabético};
+    \node[anchor=east, font=\scriptsize\color{black!60}] at (12.25, -5.2) {$391\,901$ términos en orden alfabético};
     
     % 6 celdas con separación fija de 2 mm
     \node[cell, minimum width=1.70cm] at (1.15, -6.15) {\texttt{len\_termino}\\ \tiny\color{black!70} 2 bytes};
@@ -713,12 +718,12 @@ La arquitectura del formato se fundamenta en dos principios rectores:
     \node[cell, minimum width=1.30cm] at (11.65, -6.15) {\texttt{bytes}\\ \tiny\color{black!70} 4 bytes};
 
     % -----------------------------------------------------------
-    % Sección 4: Postings (459 396 tuplas x 12 bytes)
+    % Sección 4: Postings (9 258 793 tuplas x 12 bytes)
     % -----------------------------------------------------------
     \node[secnum, color=purple!70!black] at (0, -7.47) {Sección 4};
     \node[secnode, fill=purple!8, minimum width=12.6cm, minimum height=2.1cm] (s4) at (6.3, -8.55) {};
     \node[anchor=west, font=\bfseries\footnotesize] at (0.35, -7.9) {Listas contiguas de ocurrencias};
-    \node[anchor=east, font=\scriptsize\color{black!60}] at (12.25, -7.9) {$479\,680$ tuplas · 12 bytes cada una};
+    \node[anchor=east, font=\scriptsize\color{black!60}] at (12.25, -7.9) {$9\,258\,793$ tuplas · 12 bytes cada una};
     
     % 3 celdas con separación fija de 2 mm
     \node[cell, minimum width=3.30cm] at (1.95, -8.85) {\texttt{doc\_id}\\ \tiny\color{black!70} 4 bytes · uint32};
@@ -733,9 +738,9 @@ La arquitectura del formato se fundamenta en dos principios rectores:
     \foreach \y/\txt in {
       1.5/{0x00000000},
       -2.1/{0x00000040},
-      -4.8/{0x00005630},
-      -7.5/{0x001B2423},
-      -9.6/{0x0072F923}
+      -4.8/{0x0006B700},
+      -7.5/{0x00BAFEE9},
+      -9.6/{0x075A54D5}
     } {
       \draw[line width=0.8pt, blue!70!black] (-0.50, \y) -- (-0.20, \y);
       \node[offsetlabel] at (-0.60, \y) {\txt};
@@ -750,9 +755,9 @@ La arquitectura del formato se fundamenta en dos principios rectores:
 Los primeros sesenta y cuatro bytes del archivo corresponden a los metadatos globales del índice, situados en el intervalo comprendido entre \texttt{0x00000000} y \texttt{0x0000003F}, accesibles mediante el comando \texttt{hexdump -C -n 64 propio/salida/indice\_estandar.idx}:
 
 \begin{lstlisting}[language=bash, caption={Volcado del encabezado mediante \texttt{hexdump}.}]
-00000000  45 4e 43 55 41 44 52 45  01 00 0f 00 f4 01 00 00  |ENCUADRE........|
-00000010  00 ed 00 00 c0 51 07 00  00 00 00 00 40 00 00 00  |.....Q......@...|
-00000020  00 00 00 00 30 56 00 00  00 00 00 00 23 24 1b 00  |....0V......#$..|
+00000000  45 4e 43 55 41 44 52 45  01 00 0f 00 10 27 00 00  |ENCUADRE.....'..|
+00000010  dd fa 05 00 29 47 8d 00  00 00 00 00 40 00 00 00  |....)G......@...|
+00000020  00 00 00 00 00 b7 06 00  00 00 00 00 e9 fe ba 00  |................|
 00000030  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
 \end{lstlisting}
 
@@ -768,12 +773,12 @@ Los primeros sesenta y cuatro bytes del archivo corresponden a los metadatos glo
     \texttt{0x00 - 0x07} & \texttt{char[8]} & 8 & Firma mágica de identificación: \texttt{ENCUADRE} \\
     \texttt{0x08 - 0x09} & \texttt{uint16}  & 2 & Versión del esquema binario: 1 \\
     \texttt{0x0A - 0x0B} & \texttt{uint16}  & 2 & Banderas de normalización: 0x000F con minúsculas, puntuación, palabras vacías y stemming Snowball activados \\
-    \texttt{0x0C - 0x0F} & \texttt{uint32}  & 4 & Total de documentos $N$: 500 \\
-    \texttt{0x10 - 0x13} & \texttt{uint32}  & 4 & Tamaño del vocabulario $|V|$: $60\,672$ términos \\
-    \texttt{0x14 - 0x1B} & \texttt{uint64}  & 8 & Total de ocurrencias acumuladas: $479\,680$ postings \\
+    \texttt{0x0C - 0x0F} & \texttt{uint32}  & 4 & Total de documentos $N$: 10 000 \\
+    \texttt{0x10 - 0x13} & \texttt{uint32}  & 4 & Tamaño del vocabulario $|V|$: $391\,901$ términos \\
+    \texttt{0x14 - 0x1B} & \texttt{uint64}  & 8 & Total de ocurrencias acumuladas: $9\,258\,793$ postings \\
     \texttt{0x1C - 0x23} & \texttt{uint64}  & 8 & Desplazamiento a la tabla de documentos: byte 64, equivalente a 0x40 \\
-    \texttt{0x24 - 0x2B} & \texttt{uint64}  & 8 & Desplazamiento a la sección del diccionario: byte $22\,064$, equivalente a 0x5630 \\
-    \texttt{0x2C - 0x33} & \texttt{uint64}  & 8 & Desplazamiento a la sección de postings: byte $1\,778\,723$, equivalente a 0x1B2423 \\
+    \texttt{0x24 - 0x2B} & \texttt{uint64}  & 8 & Desplazamiento a la sección del diccionario: byte $440\,064$, equivalente a 0x6B700 \\
+    \texttt{0x2C - 0x33} & \texttt{uint64}  & 8 & Desplazamiento a la sección de postings: byte $12\,254\,953$, equivalente a 0xBAFEE9 \\
     \texttt{0x34 - 0x3F} & \texttt{byte[12]} & 12 & Modelo de ponderación: byte 0 con el esquema $tf$, byte 1 con el esquema $idf$ y byte 2 con banderas de coseno e IDF suavizado; los nueve bytes restantes quedan en cero \\
     \bottomrule
   \end{tabularx}
@@ -792,23 +797,23 @@ A partir de la posición \texttt{0x00000040} se despliega la tabla continua de d
 \begin{lstlisting}[language=bash, caption={Volcado de los dos primeros registros documentales mediante \texttt{hexdump}.}]
 00000040  00 00 00 00 df 3c 0a bb  ab e9 ad 1e 5a a2 0b eb  |.....<......Z...|
 00000050  3e f1 5f 63 59 07 48 16  c4 71 75 14 6d fa a8 20  |>._cY.H..qu.m.. |
-00000060  ac ce 46 b6 e3 34 00 00  4c f3 9d 43 01 00 00 00  |..F..4..L..C....|
+00000060  ac ce 46 b6 e3 34 00 00  08 f4 bb 43 01 00 00 00  |..F..4.....C....|
 00000070  08 67 35 fc f8 5c 56 b5  f3 fd 10 2c 83 71 19 7a  |.g5..\V....,.q.z|
 00000080  bf a2 11 ec  21 90 9d ff  5a b5 99 da 83 37 0c c2  |....!...Z....7..|
-00000090  5b 0d 00 00 e9 13 32 43                           |.[.....2C|
+00000090  5b 0d 00 00 25 75 43 43                           |[...%uCC|
 \end{lstlisting}
 
 Al examinar detalladamente los primeros dos registros del volcado anterior, se aprecian sus componentes correspondientes:
 \begin{itemize}
     \item \textbf{Documento 0 en el rango \texttt{0x00000040} a \texttt{0x0000006B}:}
-    identificador secuencial cero, resumen criptográfico SHA-256 almacenado en treinta y dos bytes, longitud calculada de $13\,539$ tokens y una norma vectorial $\|d\|_2 = 315.9008$ representada por la secuencia en coma flotante \texttt{4c f3 9d 43}.
+    identificador secuencial cero, resumen criptográfico SHA-256 almacenado en treinta y dos bytes, longitud calculada de $13\,539$ tokens y una norma vectorial $\|d\|_2 = 375.9065$ representada por la secuencia en coma flotante \texttt{08 f4 bb 43}.
     \item \textbf{Documento 1 en el rango \texttt{0x0000006C} a \texttt{0x00000097}:}
-    identificador secuencial uno, resumen SHA-256, longitud de $3\,419$ tokens y norma $\|d\|_2 = 178.0778$ codificada en los bytes \texttt{e9 13 32 43}.
+    identificador secuencial uno, resumen SHA-256, longitud de $3\,419$ tokens y norma $\|d\|_2 = 195.4576$ codificada en los bytes \texttt{25 75 43 43}.
 \end{itemize}
 
 \subsection{Diccionario o vocabulario}
 
-En la dirección \texttt{0x00005630}, obtenida al sumar el bloque de cabecera y las quinientas entradas documentales previas, comienza la sección del léxico, donde cada término se estructura con una longitud dinámica según la extensión de su cadena:
+En la dirección \texttt{0x0006B700}, obtenida al sumar el bloque de cabecera y las diez mil entradas documentales previas, comienza la sección del léxico, donde cada término se estructura con una longitud dinámica según la extensión de su cadena:
 \begin{itemize}
     \item \texttt{len\_termino}: entero de 16 bits y 2 bytes con la longitud de la cadena en UTF-8.
     \item \texttt{termino\_utf8}: bytes legibles directamente en la columna ASCII del visor hexadecimal.
@@ -819,23 +824,23 @@ En la dirección \texttt{0x00005630}, obtenida al sumar el bloque de cabecera y 
 \end{itemize}
 
 \begin{lstlisting}[language=bash, caption={Volcado del diccionario de términos mediante \texttt{hexdump}.}]
-00005630  03 00 30 2d 30 01 00 00  00 70 ee c6 40 23 24 1b  |..0-0....p..@#$.|
-00005640  00 00 00 00 00 0c 00 00  00 0d 00 30 2d 31 32 2d  |...........0-12-|
-00005650  34 39 30 36 33 30 2d 33  01 00 00 00 70 ee c6 40  |490630-3....p..@|
-00005660  2f 24 1b 00 00 00 00 00  0c 00 00 00 03 00 30 2d  |/$............0-|
-00005670  32 01 00 00 00 70 ee c6  40 3b 24 1b 00 00 00 00  |2....p..@;$.....|
+0006b700  04 00 30 27 37 35 01 00  00 00 f7 5d 13 41 e9 fe  |..0'75.....].A..|
+0006b710  ba 00 00 00 00 00 0c 00  00 00 08 00 30 27 63 6f  |............0'co|
+0006b720  6e 6e 65 6c 02 00 00 00  3e 47 08 41 f5 fe ba 00  |nnel....>G.A....|
+0006b730  00 00 00 00 18 00 00 00  06 00 30 27 6e 65 61 6c  |..........0'neal|
+0006b740  01 00 00 00 f7 5d 13 41  0d ff ba 00 00 00 00 00  |.....].A........|
 \end{lstlisting}
 
 Al contrastar las entradas consecutivas capturadas en el volcado anterior, se comprueba la serialización individual de cada término:
 \begin{itemize}
-    \item \textbf{Término \texttt{"0-0"}:} longitud de 3 bytes con valor \texttt{03 00}, cadena ASCII legible \texttt{"0-0"}, $df = 1$, peso inverso $IDF = \ln(500/1 + 1) = 6.2166$ en los bytes \texttt{70 ee c6 40}, desplazamiento de postings en \texttt{0x001B2423} y tamaño de postings de 12 bytes.
-    \item \textbf{Término \texttt{"0-12-490630-3"}:} longitud de 13 bytes con valor \texttt{0d 00}, caracteres visibles en el visor ASCII \texttt{"0-12-490630-3"} y desplazamiento de ocurrencias en \texttt{0x001B242F}.
-    \item \textbf{Término \texttt{"0-2"}:} longitud de 3 bytes con valor \texttt{03 00}, carácter visible \texttt{"0-2"} y desplazamiento de ocurrencias en \texttt{0x001B243B}.
+    \item \textbf{Término \texttt{"0'75"}:} longitud de 4 bytes con valor \texttt{04 00}, cadena ASCII legible \texttt{"0'75"}, $df = 1$, peso inverso $IDF = \ln(10\,000/1 + 1) = 9.2104$ en los bytes \texttt{f7 5d 13 41}, desplazamiento de postings en \texttt{0x00BAFEE9} y tamaño de postings de 12 bytes.
+    \item \textbf{Término \texttt{"0'connel"}:} longitud de 8 bytes con valor \texttt{08 00}, caracteres visibles en el visor ASCII \texttt{"0'connel"}, $df = 2$ con $IDF = \ln(10\,000/2 + 1) = 8.5174$ en los bytes \texttt{3e 47 08 41}, y su bloque de postings ocupa 24 bytes a partir de \texttt{0x00BAFEF5}.
+    \item \textbf{Término \texttt{"0'neal"}:} longitud de 6 bytes con valor \texttt{06 00}, carácter visible \texttt{"0'neal"} y desplazamiento de ocurrencias en \texttt{0x00BAFF0D}.
 \end{itemize}
 
 \subsection{Listas de ocurrencias o postings}
 
-A partir del byte \texttt{0x001B2423} se despliegan las listas de ocurrencias agrupadas por término, en las cuales cada posting individual se compacta en doce bytes según el patrón \texttt{<IIf}:
+A partir del byte \texttt{0x00BAFEE9} se despliegan las listas de ocurrencias agrupadas por término, en las cuales cada posting individual se compacta en doce bytes según el patrón \texttt{<IIf}:
 \begin{itemize}
     \item \texttt{doc\_id}: identificador de documento de 32 bits y 4 bytes.
     \item \texttt{tf}: frecuencia bruta del término en el documento, en 4 bytes.
@@ -843,9 +848,9 @@ A partir del byte \texttt{0x001B2423} se despliegan las listas de ocurrencias ag
 \end{itemize}
 
 \begin{lstlisting}[language=bash, caption={Volcado de la lista de ocurrencias mediante \texttt{hexdump}.}]
-001b2423  1b 01 00 00 02 00 00 00  fa 68 28 41 8a 00 00 00  |.........h(A....|
-001b2433  01 00 00 00 70 ee c6 40  4d 00 00 00 04 00 00 00  |....p..@M.......|
-001b2443  bc 5a 6d 41 85 01 00 00  01 00 00 00 70 ee c6 40  |.ZmA........p..@|
+00bafee9  00 11 00 00 01 00 00 00  f7 5d 13 41 77 1d 00 00  |.........].Aw...|
+00bafef9  01 00 00 00 3e 47 08 41  f8 1f 00 00 01 00 00 00  |....>G.A........|
+00baff09  3e 47 08 41 b1 0d 00 00  01 00 00 00 f7 5d 13 41  |>G.A.........].A|
 \end{lstlisting}
 
 \begin{table}[htbp]
@@ -857,19 +862,19 @@ A partir del byte \texttt{0x001B2423} se despliegan las listas de ocurrencias ag
     \toprule
     \textbf{Offset hex} & \textbf{Doc} & \textbf{TF} & \textbf{Hex IEEE 754} & \textbf{Peso $w_{t,d}$} & \textbf{Término} \\
     \midrule
-    \texttt{0x001B2423} & \texttt{283} & 2 & \texttt{fa 68 28 41} & $10.5256$ & \texttt{"0-0"} \\
-    \texttt{0x001B242F} & \texttt{138} & 1 & \texttt{70 ee c6 40} & $6.2166$ & \texttt{"0-12-490630-3"} \\
-    \texttt{0x001B243B} & \texttt{77}  & 4 & \texttt{bc 5a 6d 41} & $14.8347$ & \texttt{"0-2"} \\
-    \texttt{0x001B2447} & \texttt{389} & 1 & \texttt{70 ee c6 40} & $6.2166$ & \texttt{"0-34"} \\
+    \texttt{0x00BAFEE9} & \texttt{4352} & 1 & \texttt{f7 5d 13 41} & $9.2104$ & \texttt{"0'75"} \\
+    \texttt{0x00BAFEF5} & \texttt{7543} & 1 & \texttt{3e 47 08 41} & $8.5174$ & \texttt{"0'connel"} \\
+    \texttt{0x00BAFF01} & \texttt{8184} & 1 & \texttt{3e 47 08 41} & $8.5174$ & \texttt{"0'connel"} \\
+    \texttt{0x00BAFF0D} & \texttt{3505} & 1 & \texttt{f7 5d 13 41} & $9.2104$ & \texttt{"0'neal"} \\
     \bottomrule
   \end{tabular*}
 \end{table}
 
-La correspondencia del modelo matemático se comprueba verificando la coincidencia entre la ponderación teórica y su registro binario; por ejemplo, para el término \texttt{"0-0"} presente en el documento doscientos ochenta y tres con una frecuencia $tf=2$:
+La correspondencia del modelo matemático se comprueba verificando la coincidencia entre la ponderación teórica y su registro binario; por ejemplo, para el término \texttt{"0-0"}, cuyo bloque comienza en \texttt{0x00BAFF19}, presente en el documento doscientos ochenta y tres con una frecuencia $tf=2$ y $df = 27$:
 \begin{equation}
-    w_{t,d} = (1 + \ln(2)) \times 6.2166 = (1 + 0.693147) \times 6.2166 \approx 10.5256
+    w_{t,d} = (1 + \ln(2)) \times \ln(10\,000/27 + 1) = (1 + 0.693147) \times 5.9172 \approx 10.0187
 \end{equation}
-cuyo valor en coma flotante Little-Endian IEEE 754 genera con exactitud la secuencia \texttt{fa 68 28 41}, equivalente a \texttt{0x412868fa} y presente de forma idéntica en el archivo físico.
+cuyo valor en coma flotante Little-Endian IEEE 754 genera con exactitud la secuencia \texttt{8e 4c 20 41}, equivalente a \texttt{0x41204C8E} y presente de forma idéntica en el archivo físico.
 
 \subsection{Inspección automatizada de la estructura binaria}
 
@@ -893,8 +898,7 @@ uv run indexador inspeccionar salida/indice_estandar.idx --termino "film"
 \bibitem{unicode15} Unicode Consortium, ``Unicode Standard Annex \#15: Unicode Normalization Forms''. \url{https://unicode.org/reports/tr15/}
 \bibitem{iso25964} ISO, \textit{ISO 25964-1:2011, Information and documentation -- Thesauri and interoperability with other vocabularies -- Part 1: Thesauri for information retrieval}, 2011. \url{https://www.iso.org/standard/53657.html}
 \bibitem{nadeau2007} D.~Nadeau y S.~Sekine, ``A survey of named entity recognition and classification'', \textit{Lingvisticae Investigationes}, vol.~30, n.º~1, pp.~3--26, 2007. \url{https://doi.org/10.1075/li.30.1.03nad}
-\bibitem{lucene-wordlist} Apache Lucene, documentación de la clase \texttt{WordlistLoader}. \url{https://lucene.apache.org/core/9_10_0/core/org/apache/lucene/analysis/WordlistLoader.html}
-\bibitem{lucene-solrsyn} Apache Lucene, documentación de la clase \texttt{SolrSynonymParser}. \url{https://lucene.apache.org/core/8_1_0/analyzers-common/org/apache/lucene/analysis/synonym/SolrSynonymParser.html}
+\bibitem{es-stopfilter} Elasticsearch, documentación del filtro de análisis \texttt{stop}. \url{https://www.elastic.co/guide/en/elasticsearch/reference/8.15/analysis-stop-tokenfilter.html}
 \end{thebibliography}
 
 \end{document}

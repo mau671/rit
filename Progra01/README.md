@@ -1,55 +1,69 @@
-# Indexador — Motor Encuadre
+# Progra01 — Creación del índice de búsqueda (Encuadre)
 
-Índice invertido binario construido a mano para el corpus audiovisual de
-[`../Progra00/`](../Progra00/). Escribe un archivo `.idx` con `struct.pack` y
-`struct.unpack` en Little-Endian, sin bibliotecas de indexación, y responde
-consultas con el modelo vectorial TF/IDF y similitud coseno.
+Primera entrega del motor de búsqueda **Encuadre** del curso IC-8060,
+Recuperación de Información Textual (TEC). Construye un índice invertido sobre
+el corpus audiovisual de [`../Progra00/`](../Progra00/) con **dos
+implementaciones equivalentes** —misma colección, mismas tres políticas de
+normalización, misma fórmula TF/IDF con similitud coseno— y documenta el
+resultado en [`Progra01.pdf`](Progra01.pdf).
 
-Curso IC-8060, Recuperación de Información Textual — Tecnológico de Costa Rica.
+## Estructura
 
-## Requisitos
+```
+Progra01/
+├── Progra01.tex / Progra01.pdf   informe del curso
+├── tablas/  datos/  imgs/        tablas y series que alimenta el informe
+├── recursos/                     stopwords, sinónimos y tesauro (los leen las dos implementaciones)
+├── casos_prueba/                 casos de normalización compartidos (28)
+├── propio/                       implementación 1: índice binario hecho a mano (Python + SPIMI)
+│   ├── configuraciones/          minimo.conf, estandar.conf, avanzado.conf
+│   ├── src/indexador/            motor: normalización, SPIMI, formato binario, búsqueda
+│   ├── scripts/                  pruebas compartidas, estadísticas y comparación
+│   ├── tests/                    pruebas unitarias e integración
+│   └── salida/                   índices .idx y benchmark_indices.json (no se versionan)
+└── elasticsearch/                implementación 2: Elasticsearch/Lucene (Node.js)
+    └── salida/                   benchmark_elasticsearch.json y estadísticas por política
+```
 
-Python 3.13+ y [`uv`](https://docs.astral.sh/uv/):
+La colección debe estar en `../Progra00/almacenamiento/` (la base SQLite
+`metadatos_araña.db` y el repositorio de texto plano).
+
+## Regenerar todo el informe
+
+Desde `propio/`, con Python 3.13+ y [`uv`](https://docs.astral.sh/uv/):
 
 ```bash
+cd propio
 uv sync
+bash scripts/regenerar_todo.sh 10000
 ```
 
-El indexador lee la colección desde `../Progra00/almacenamiento/` (la base
-SQLite `metadatos_araña.db` y el repositorio de texto plano), por lo que ambas
-carpetas deben estar al mismo nivel.
+El script corre las pruebas, construye y verifica los tres índices, recalcula
+las estadísticas del informe (`tablas/` y `datos/`), integra la comparación
+con Elasticsearch y recompila `Progra01.pdf`. Se corre tras cambiar el
+normalizador, una lista de `recursos/` o una política.
 
-## Uso
+La parte de Elasticsearch se mide aparte (requiere Docker): ver
+[`elasticsearch/README.md`](elasticsearch/README.md). Con el mismo límite de
+documentos, `npm run benchmark` escribe `elasticsearch/salida/` y
+`propio/scripts/comparativo_es.py` lo convierte en la tabla comparativa del
+informe. Los `.idx` no se versionan: este script los deja en disco.
+
+## Uso rápido del indexador propio
 
 ```bash
-# 1. Construir un índice con una política específica
+cd propio
 uv run indexador indexar --config configuraciones/estandar.conf --limite 1000
-
-# 2. Inspeccionar la estructura binaria (offsets, términos, postings, hexdump)
-uv run indexador inspeccionar salida/indice_estandar.idx --termino "film"
-
-# 2b. Comprobar la integridad del archivo (offsets, orden, bloques de postings)
 uv run indexador inspeccionar salida/indice_estandar.idx --verificar
-
-# 3. Consultar con similitud coseno
 uv run indexador buscar salida/indice_estandar.idx "film director" --top 5
-
-# 4. Comparar el rendimiento de las 3 políticas
-uv run indexador benchmark --limite 500
+uv run indexador benchmark --limite 10000
 ```
-
-Todo comando imprime primero la normalización que declara el encabezado del
-archivo, de modo que se ve con qué filtros se construyó el índice consultado.
-
-`benchmark` escribe `salida/benchmark_indices.json` con vocabulario, postings,
-tamaño, tiempo, CPU y memoria pico de cada política. El pico se mide con
-`VmHWM` y se reinicia antes de cada política: sin ese reinicio, la segunda y la
-tercera heredarían el pico de la primera y la comparación no diría nada.
 
 ## Políticas de normalización
 
-Cada archivo en `configuraciones/` es un `.conf` estilo Linux que fija la
-normalización, el modelo y los parámetros de memoria de SPIMI:
+Cada archivo en `propio/configuraciones/` es un `.conf` estilo Linux que fija
+la normalización, el modelo y los parámetros de memoria de SPIMI. Las tres
+comparten TF logarítmico, IDF estándar con suavizado y normalización coseno.
 
 | Archivo | Stopwords | Stemming | Tildes | Números | Fechas | Sinónimos |
 |---|---|---|---|---|---|---|
@@ -57,8 +71,10 @@ normalización, el modelo y los parámetros de memoria de SPIMI:
 | `estandar.conf` | ES+EN | Snowball | Se conservan | No | No | No |
 | `avanzado.conf` | ES+EN | Snowball | Se pliegan (conserva la ñ) | Sí | Sí | Sí |
 
-Las tres políticas comparten TF logarítmico, IDF estándar con suavizado y
-normalización coseno.
+`recursos/README.md` fija el contrato de normalización paso a paso, y
+`casos_prueba/normalizacion.json` los casos que cualquier implementación debe
+reproducir: el propio con `uv run python scripts/verificar_casos.py`, y
+Elasticsearch con `herramientas/generar_casos.py` + `node src/cli.js verificar`.
 
 ## Formato binario `.idx`
 
@@ -71,16 +87,13 @@ Cuatro secciones consecutivas, todas Little-Endian:
 | Diccionario | Variable por término | Término en UTF-8, `df`, `idf`, offset y tamaño de su bloque de postings |
 | Postings | Variable | `doc_id` y peso TF/IDF de cada aparición del término |
 
-Los doce bytes que cierran el encabezado no son relleno: guardan el esquema
-$tf$, el esquema $idf$ y las banderas de normalización coseno e IDF suavizado.
-Con la máscara de normalización, eso permite que una consulta se procese con
-exactamente los mismos filtros y la misma ponderación con los que se construyó
-el archivo, sin depender del `.conf` que se tenga a mano.
+Todo se escribe y lee con `struct` a nivel de bytes, sin bibliotecas de
+indexación ni bases de datos embebidas. La firma ASCII `ENCUADRE` y los
+términos en UTF-8 son legibles con `hexdump -C`, que es justamente lo que hace
+el subcomando `inspeccionar`. El detalle campo por campo está en la sección 4
+del informe.
 
-La firma ASCII `ENCUADRE` y los términos en UTF-8 son legibles con
-`hexdump -C`, que es justamente lo que hace el subcomando `inspeccionar`.
-
-## Módulos
+## Módulos (propio/src/indexador)
 
 | Archivo | Responsabilidad |
 |---|---|
@@ -99,18 +112,19 @@ La firma ASCII `ENCUADRE` y los términos en UTF-8 son legibles con
 ## Pruebas
 
 ```bash
+cd propio
 uv run pytest
-uv run ruff check
+uv run ruff check src scripts tests
+cd ../elasticsearch
+npm test
 ```
 
-## Documento
+## Scripts de `propio/scripts/`
 
-El informe está en `Progra01.pdf`.
-
-## Normalización, estadísticas e informe (Persona C)
-
-- `recursos/`: stopwords, sinónimos y tesauro compartidos con Lucene; `recursos/README.md` fija el contrato de normalización.
-- `casos_prueba/normalizacion.json`: 28 casos texto → tokens esperados por política. `uv run python scripts/verificar_casos.py` (propio) o `--comando "<programa>"` (Lucene).
-- `scripts/benchmark_comparativo.py`: compara ambos indexadores (tiempo, CPU, RAM, tamaño).
-- `scripts/estadisticas_indices.py`: genera `tablas/` y `datos/` para el informe.
-- `scripts/regenerar_todo.sh [limite]`: pruebas, índices, estadísticas, comparación (si `LUCENE_CMD`) y recompila `Progra01.pdf`. Hay que correrlo tras cambiar el normalizador o `recursos/`.
+| Archivo | Qué hace |
+|---|---|
+| `verificar_casos.py` | comprueba los 28 casos compartidos (`--comando` para un indexador externo) |
+| `estadisticas_indices.py` | calcula las estadísticas de los tres `.idx` y escribe `tablas/` y `datos/` |
+| `comparativo_es.py` | escribe `tablas/comparativo.tex` a partir del benchmark propio y del de Elasticsearch |
+| `benchmark_comparativo.py` | medidor genérico contra un indexador externo (opcional; no lo usa el informe) |
+| `regenerar_todo.sh` | el flujo completo de regeneración descrito arriba |

@@ -1,5 +1,5 @@
 // Pruebas unitarias que no necesitan Elasticsearch ni la colección: npm test
-// Usan una copia mínima del propio en test/fixtures/Progra01.
+// Usan una copia mínima del propio en test/fixtures/Progra01/propio.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -12,7 +12,7 @@ import { construirIndice, reglasTesauro } from "../src/analizadores.js";
 import { cargarRecursos } from "../src/recursos.js";
 import { pesoTf, idf } from "../src/similitud.js";
 
-const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "Progra01", "Progra01-ES");
+const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "Progra01", "elasticsearch");
 const conf = (p) => cargarConfiguracion(join(FIXTURE, "configuraciones", `${p}.conf`));
 const filtrosDe = (p) => construirIndice(conf(p)).settings.analysis.analyzer.politica_es.filter;
 

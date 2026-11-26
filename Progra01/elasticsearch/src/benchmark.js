@@ -1,12 +1,12 @@
 // benchmark.js
 // Construye los índices de las tres políticas y los compara con el benchmark
-// del indexador propio (salida/benchmark_indices.json de Progra01).
+// del indexador propio (propio/salida/benchmark_indices.json).
 //
 // Para que la comparación sea justa, usá el mismo --limite con el que se
-// generó el benchmark del propio (el del repo usa 500 documentos).
+// generó el benchmark del propio (el del repo usa 10 000 documentos).
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { cargarConfiguracion } from "./configuracion.js";
 import { indexar } from "./indexador.js";
@@ -57,7 +57,9 @@ export async function benchmark(rutasConf, { limite = 0, benchmarkPropio } = {})
   mkdirSync(dirSalida, { recursive: true });
   writeFileSync(join(dirSalida, "benchmark_elasticsearch.json"), JSON.stringify(resultados, null, 2), "utf-8");
 
-  const rutaPropio = resolve(benchmarkPropio ?? join(rutasConf[0], "..", "..", "..", "salida", "benchmark_indices.json"));
+  const rutaPropio = resolve(
+    benchmarkPropio ?? join(dirname(rutasConf[0]), "..", "..", "propio", "salida", "benchmark_indices.json"),
+  );
   let propio = [];
   if (existsSync(rutaPropio)) {
     propio = JSON.parse(readFileSync(rutaPropio, "utf-8"));

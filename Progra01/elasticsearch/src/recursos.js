@@ -5,9 +5,8 @@
 // usa el propio (Progra01/recursos/, ruta "recursos" en el .conf), así que si
 // el grupo cambia una lista, los dos indexadores la ven igual sin copiar nada.
 //
-// Las raíces fijas de los términos canónicos (recursos/raices_fijas.txt de
-// Progra01-ES) se generan con el stemmer del propio: las escribe
-// herramientas/generar_casos.py.
+// Las raíces fijas de los términos canónicos (elasticsearch/recursos/raices_fijas.txt)
+// se generan con el stemmer del propio: las escribe herramientas/generar_casos.py.
 //
 // Las expresiones regulares son las del propio traducidas a Java (ver abajo).
 

@@ -37,7 +37,7 @@ export async function verificar(config, rutaCasos) {
   if (!existsSync(ruta)) {
     throw new Error(
       `No existe ${ruta}.\nGeneralo desde la carpeta del propio con:\n` +
-        `  uv run python Progra01-ES/herramientas/generar_casos.py --politica ${politica}`,
+        `  uv run python ../elasticsearch/herramientas/generar_casos.py --politica ${politica}`,
     );
   }
   const casos = JSON.parse(readFileSync(ruta, "utf-8"));

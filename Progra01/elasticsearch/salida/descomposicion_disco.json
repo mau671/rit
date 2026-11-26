@@ -1,0 +1,41 @@
+{
+  "descripcion": "Descomposición del disco de cada índice medida con la API _disk_usage (POST /<indice>/_disk_usage?run_expensive_tasks=true) sobre el índice vivo y ya reposado, instantánea del 25-11-2026 ~21:37. Evidencia de qué estructura ocupa el tamaño neto (store - _recovery_source) que reportan estadisticas_<politica>.json y benchmark_elasticsearch.json. La corrida del 25-11 capturó los tamaños de estandar y avanzado a mitad de la fusión del forcemerge y se corrigieron con estas instantáneas (ver el campo tamano_nota en cada estadística).",
+  "politicas": {
+    "minimo": {
+      "store_bytes": 237595118,
+      "recovery_source_bytes": 208910125,
+      "tamano_neto_bytes": 28684993,
+      "descomposicion": {
+        "indice_invertido_bytes": 24341305,
+        "stored_fields_bytes": 211464329,
+        "doc_values_bytes": 1673309,
+        "normas_bytes": 0
+      },
+      "nota": "normas en 0 por diseño (norms: false en los campos analizados, igual que el propio)."
+    },
+    "estandar": {
+      "store_bytes": 81554570,
+      "recovery_source_bytes": 60257108,
+      "tamano_neto_bytes": 21297462,
+      "descomposicion": {
+        "indice_invertido_bytes": 16982476,
+        "stored_fields_bytes": 62689780,
+        "doc_values_bytes": 1695725,
+        "normas_bytes": 0
+      },
+      "nota": "normas en 0 por diseño (norms: false en los campos analizados, igual que el propio)."
+    },
+    "avanzado": {
+      "store_bytes": 53151218,
+      "recovery_source_bytes": 32958057,
+      "tamano_neto_bytes": 20193161,
+      "descomposicion": {
+        "indice_invertido_bytes": 16508583,
+        "stored_fields_bytes": 34764194,
+        "doc_values_bytes": 1700513,
+        "normas_bytes": 0
+      },
+      "nota": "normas en 0 por diseño (norms: false en los campos analizados, igual que el propio)."
+    }
+  }
+}
