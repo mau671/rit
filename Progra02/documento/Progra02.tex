@@ -1,0 +1,835 @@
+\documentclass[11pt,spanish]{article}
+
+% =========================================================
+% PLANTILLA BASE PARA TAREAS ACADÉMICAS / INFORMES TÉCNICOS
+% (misma plantilla que Progra01/Progra01.tex)
+% =========================================================
+
+% --- Idioma y codificación para Tectonic / XeLaTeX ---
+\usepackage[spanish,es-tabla,es-noshorthands]{babel}
+\usepackage{fontspec}
+
+% --- Márgenes / papel ---
+\usepackage{geometry}
+\geometry{a4paper, margin=2.7cm}
+
+% --- Matemáticas ---
+\usepackage{amsmath,amssymb}
+
+% --- Tablas, enlaces y elementos visuales ---
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta,calc}
+\usepackage{enumitem}
+\usepackage{ragged2e}
+\usepackage{caption}
+\captionsetup{skip=6pt}
+\captionsetup[table]{position=top}
+\captionsetup[figure]{position=bottom}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+
+% --- Configuración de párrafo en bloque ---
+\makeatletter
+\renewcommand\paragraph{\@startsection{paragraph}{4}{\z@}%
+  {2.2ex \@plus1ex \@minus.2ex}%
+  {0.8ex}%
+  {\normalfont\normalsize\bfseries}}
+\makeatother
+
+% --- Listados de código con formato elegante ---
+\usepackage{listings}
+
+\definecolor{codebg}{rgb}{0.97,0.97,0.98}
+\definecolor{codeframe}{rgb}{0.85,0.85,0.88}
+\definecolor{commentgreen}{rgb}{0.13,0.54,0.13}
+\definecolor{keywordblue}{rgb}{0.0,0.2,0.7}
+\definecolor{stringpurple}{rgb}{0.6,0.1,0.4}
+
+% --- Colores para esquemas y diagramas TikZ ---
+\definecolor{softblue}{rgb}{0.88, 0.93, 1.0}
+\definecolor{softgreen}{rgb}{0.88, 0.96, 0.88}
+\definecolor{softorange}{rgb}{1.0, 0.92, 0.82}
+\definecolor{softpurple}{rgb}{0.93, 0.88, 0.98}
+\definecolor{softteal}{rgb}{0.85, 0.95, 0.95}
+\definecolor{softyellow}{rgb}{1.0, 0.95, 0.80}
+
+\lstdefinestyle{customcode}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=none,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    frame=single,
+    rulecolor=\color{codeframe},
+    commentstyle=\color{commentgreen}\itshape,
+    keywordstyle=\color{keywordblue}\bfseries,
+    stringstyle=\color{stringpurple},
+    xleftmargin=0.5em,
+    xrightmargin=0.5em
+}
+
+\lstdefinestyle{customcodenum}{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=6pt,
+    numberstyle=\tiny\color{gray},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    frame=single,
+    rulecolor=\color{codeframe},
+    commentstyle=\color{commentgreen}\itshape,
+    keywordstyle=\color{keywordblue}\bfseries,
+    stringstyle=\color{stringpurple},
+    xleftmargin=1.5em,
+    xrightmargin=0.5em
+}
+
+\lstset{style=customcode}
+
+% --- Encabezado y pie de página: solo número de página en el pie ---
+\usepackage{fancyhdr}
+\setlength{\headheight}{15pt}
+\setlength{\footskip}{25pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancyfoot[C]{\thepage}
+
+\fancypagestyle{plain}{%
+    \fancyhf{}%
+    \renewcommand{\headrulewidth}{0pt}%
+    \renewcommand{\footrulewidth}{0pt}%
+    \fancyfoot[C]{\thepage}%
+}
+
+% --- \input de filas generadas dentro de tabular ---
+\makeatletter\newcommand{\filas}[1]{\@@input #1 }\makeatother
+
+% --- Interlineado ---
+\linespread{1.2}
+\sloppy
+
+% --- Dato que falta en la portada ---
+\newcommand{\pendiente}[1]{\emph{#1 (pendiente)}}
+
+% --- Aviso honesto sobre el estado de los datos de salida ---
+\newcommand{\AlertaDatos}{%
+  \noindent\textbf{Estado de los datos.}\quad
+  Al generar este informe, \texttt{Progra02/salida/} sólo contiene el archivo
+  \texttt{.gitkeep}: no hay búsquedas registradas, juicios ni métricas
+  calculadas. Las tablas siguientes están estructuradas y muestran
+  explícitamente \emph{sin datos}; se llenan al correr la evaluación y volver
+  a ejecutar \texttt{scripts/tablas.py}. No se han estimado cifras.
+  \par\smallskip
+}
+
+% =========================================================
+% DATOS DEL DOCUMENTO
+% =========================================================
+\newcommand{\Institucion}{Instituto Tecnológico de Costa Rica}
+\newcommand{\Campus}{Escuela de Ingeniería en Computación}
+\newcommand{\DocumentoTitulo}{Progra02}
+\newcommand{\DocumentoSubtitulo}{Búsqueda y evaluación sobre el corpus de cine}
+\newcommand{\NombreBuscador}{Encuadre}
+\newcommand{\Curso}{IC-8060 Recuperación de Información Textual}
+\newcommand{\Profesor}{Aurelio Sanabria}
+\newcommand{\FechaDocumento}{Noviembre de 2026}
+\newcommand{\PeriodoAcademico}{II Semestre}
+\newcommand{\AnioDocumento}{2026}
+
+% Autores con nombre a la izquierda y carné a la derecha
+\newcommand{\AutoresPortada}{%
+\begin{minipage}{0.85\textwidth}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lr@{}}
+Santiago Espinoza Rendon & 2024156530 \\
+Fabián Araya Ortega & 2019159110 \\
+Mauricio González Prendas & 2024143009 \\
+José Fabián Zumbado Ruiz & \pendiente{carné} \\
+\end{tabular*}
+\end{minipage}%
+}
+
+% Metadatos PDF
+\title{\DocumentoTitulo}
+\author{Santiago Espinoza Rendon, Fabián Araya Ortega, Mauricio González Prendas, José Fabián Zumbado Ruiz}
+\date{\FechaDocumento}
+
+% =========================================================
+% CONFIGURACIÓN DE TABLAS Y UTILIDADES
+% =========================================================
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{P}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+\newcommand{\offset}[1]{{\ttfamily\scriptsize\color{blue!80!black}#1}}
+\renewcommand{\arraystretch}{1.22}
+\setlength{\LTpre}{0.5em}
+\setlength{\LTpost}{0.5em}
+
+% =========================================================
+% PORTADA
+% =========================================================
+\newcommand{\MakeCover}{%
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+
+{\bfseries \huge \Institucion \par}
+\vspace{0.25cm}
+{\LARGE \Campus \par}
+\vspace{0.15cm}
+{\LARGE \Curso \par}
+\vspace{0.5cm}
+\includegraphics[width=0.22\linewidth]{imgs/logo.png}
+
+\vfill
+
+{\huge \bfseries \DocumentoTitulo: \DocumentoSubtitulo \par}
+\vspace{0.4cm}
+{\Large \textit{\NombreBuscador} \par}
+
+\vfill
+
+{\bfseries \LARGE Profesor: \par}
+\vspace{0.2cm}
+{\Large \Profesor \par}
+
+\vfill
+
+{\bfseries \LARGE Estudiantes: \par}
+\vspace{0.3cm}
+{\Large \AutoresPortada \par}
+
+\vfill
+
+{\bfseries\LARGE Fecha: \par}
+\vspace{0.2cm}
+{\Large \FechaDocumento \par}
+
+\vfill
+
+{\LARGE \PeriodoAcademico \par}
+{\LARGE \AnioDocumento \par}
+
+\vfill
+
+\end{titlepage}%
+}
+
+% =========================================================
+% DOCUMENTO PRINCIPAL
+% =========================================================
+\begin{document}
+\hypersetup{pageanchor=false}
+
+\MakeCover
+
+\pagenumbering{roman}
+\pagestyle{plain}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+\hypersetup{pageanchor=true}
+\pagestyle{fancy}
+
+% =========================================================
+% SECCIÓN 1: NECESIDAD DE INFORMACIÓN Y CORPUS
+% =========================================================
+\section{Necesidad de información y descripción del corpus}
+\label{sec:necesidad}
+
+La necesidad de información que originó este proyecto es encontrar, dentro del
+corpus recolectado en Progra00, pasajes de guiones y páginas de cine que
+realmente respondan a una pregunta concreta ---por ejemplo, qué películas
+dirigió una persona, en qué escena aparece un personaje o qué se dice sobre un
+filme en una reseña--- y poder verlos en su página de origen. El corpus reúne
+\textbf{317\,657 documentos de texto}, cifra que se verificó contando los
+archivos \texttt{.txt} de \texttt{Progra00/almacenamiento/repositorio/}.
+
+Los documentos provienen de nueve sitios del dominio audiovisual:
+\texttt{imsdb.com} y \texttt{dailyscript.com} (guiones),
+\texttt{simplyscripts.com} (guiones), \texttt{filmaffinity.com} (fichas y
+críticas), \texttt{sensesofcinema.com} (ensayos), \texttt{tvtropes.org}
+(referencias de películas y series), \texttt{es.wikipedia.org} (artículos),
+\texttt{tvmaze.com} (fichas de televisión) y \texttt{animenewsnetwork.com}
+(noticias de animación). La colección mezcla español e inglés, e incluso un
+mismo guion puede contener diálogos o créditos en ambos idiomas; esa es la
+razón de que el índice separó los campos \texttt{contenido\_es} y
+\texttt{contenido\_en} y de que el buscador consulte los dos a la vez.
+
+La escala del corpus condiciona el diseño: una prueba de escalado de Progra01
+sobre veinte mil documentos proyectó alrededor de una hora de indexación y
+$3{,}7$~GB para la colección completa~\cite{manning2008}. Por eso Encuadre no
+reconstruye ningún índice ni relee toda la colección para responder: consulta
+los índices ya construidos y solo abre el archivo \texttt{.txt} del documento
+que va a mostrar en los fragmentos.
+
+% =========================================================
+% SECCIÓN 2: ARQUITECTURA
+% =========================================================
+\section{Arquitectura: relación con Progra00 y Progra01}
+\label{sec:arquitectura}
+
+El proyecto es independiente de la araña y del indexador: no descarga páginas,
+no normaliza el corpus completo y no escribe en Elasticsearch. Su entrada son
+los índices construidos por Progra01 con Elasticsearch y los archivos de texto
+que dejó Progra00. La Figura~\ref{fig:arquitectura} muestra el flujo.
+
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}[
+      node distance=0.9cm,
+      caja/.style={rectangle, rounded corners, draw=black!65, line width=0.6pt,
+        fill=softblue, align=center, font=\footnotesize,
+        minimum width=3.1cm, minimum height=1.05cm},
+      caja2/.style={caja, fill=softgreen},
+      flecha/.style={->, >=Stealth, thick, draw=blue!60!black}
+    ]
+    \node[caja] (araña) {Progra00\\araña y repositorio\\317\,657 \texttt{.txt}};
+    \node[caja, right=of araña] (indice) {Progra01 / ES\\indexador\\normalización y pesos};
+    \node[caja, right=of indice] (es) {Elasticsearch\\\texttt{rit\_minimo}, \texttt{rit\_estandar},\\\texttt{rit\_avanzado}};
+    \node[caja2, below=1.5cm of es] (servidor) {Encuadre\\servidor Node.js\\API \texttt{/api/buscar}};
+    \node[caja2, below=1.5cm of indice] (navegador) {Navegador\\búsqueda · evaluación\\métricas};
+    \node[caja, below=1.5cm of araña] (textos) {Archivos \texttt{.txt}\\del repositorio\\para los fragmentos};
+
+    \draw[flecha] (araña) -- (indice);
+    \draw[flecha] (indice) -- (es);
+    \draw[flecha] (es) -- (servidor);
+    \draw[flecha] (servidor) -- (navegador);
+    \draw[flecha] (textos) -- (servidor);
+    \draw[flecha, dashed] (navegador) -- (servidor);
+  \end{tikzpicture}
+  \caption{Relación entre la araña (Progra00), la indexación (Progra01) y el buscador (Progra02). La línea punteada son las peticiones de la interfaz.}
+  \label{fig:arquitectura}
+\end{figure}
+
+Las tres políticas de normalización de Progra01 quedaron como tres índices:
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Índices disponibles para el buscador.}
+  \label{tab:indices}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lll@{}}
+    \toprule
+    \textbf{Índice} & \textbf{Política de Progra01} & \textbf{Efecto esperado en la búsqueda} \\
+    \midrule
+    \texttt{rit\_minimo} & Mínima & Literal; conserva palabras vacías y tildes \\
+    \texttt{rit\_estandar} & Intermedia & Sin palabras vacías; stemming Snowball \\
+    \texttt{rit\_avanzado} & Agresiva & Tesauro, sinónimos y tildes plegadas \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+El buscador permite escoger entre los tres índices habilitados en
+\texttt{buscador.conf}; por defecto usa \texttt{rit\_avanzado}. La razón es que
+esa política es la única que aplica el tesauro y pliega las tildes, de modo que
+una consulta escrita en español puede recuperar guiones en inglés
+(\textit{película} y \textit{movie} se reducen a \textit{film}). Esta es una
+\emph{hipótesis de diseño}: la comparación definitiva entre políticas se hará
+con las mismas consultas evaluadas (sección~\ref{sec:metricas}); hasta que
+existan juicios no se afirma que el índice avanzado sea mejor en nDCG o MAP.
+
+El servidor Node.js sólo expone \texttt{GET /}, \texttt{GET /api/buscar} y
+\texttt{GET /api/indices}. El contrato de datos
+(\texttt{docs/contrato-api.md}) separa al buscador de las interfaces de
+evaluación y métricas: éstas repiten la búsqueda con la misma \texttt{consulta}
+y el mismo \texttt{indice} y comparan los \texttt{id} devueltos con los juicios
+guardados. El registro de cada búsqueda se agrega a
+\texttt{salida/consultas.jsonl} porque \texttt{registrar\_consultas = true}.
+
+% =========================================================
+% SECCIÓN 3: INTERFAZ DE BÚSQUEDA
+% =========================================================
+\section{Interfaz de búsqueda y resultados}
+\label{sec:busqueda}
+
+\subsection{Sintaxis de consulta}
+
+La interfaz acepta palabras sueltas y cinco operadores sencillos, descritos en
+la propia página inicial:
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Sintaxis admitida por \texttt{consulta.js}.}
+  \label{tab:sintaxis}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lp{8.0cm}@{}}
+    \toprule
+    \textbf{Escrito} & \textbf{Efecto} \\
+    \midrule
+    \texttt{director terror} & Ordena por similitud coseno; ambas palabras suman al puntaje \\
+    \texttt{"frase exacta"} & Las palabras deben aparecer juntas y en orden (requiere posiciones en el índice) \\
+    \texttt{+kubrick} & La palabra es obligatoria y también suma al puntaje \\
+    \texttt{-remake} & Excluye los documentos que la contienen; no suma al puntaje \\
+    \texttt{dominio:imsdb.com} & Restringe a un sitio; se puede repetir \\
+    \texttt{idioma:es}, \texttt{idioma:en} & Restringe por idioma detectado por el indexador \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+Las comillas sin cerrar se interpretan como frase hasta el final de la consulta
+y los valores de \texttt{dominio:} y \texttt{idioma:} se pasan a minúsculas;
+ambos casos están cubiertos por pruebas unitarias. Cuando la consulta sólo
+contiene filtros o exclusiones, la API responde con un aviso: sin términos de
+puntaje no hay orden posible.
+
+\subsection{Ranking}
+
+El orden es la similitud coseno del modelo vectorial, con los mismos pesos con
+que se construyó el índice~\cite{manning2008,salton1988}:
+\begin{equation}
+  \operatorname{sim}(q,d) =
+  \frac{\sum_{t} w(t,q)\,w(t,d)}{\|q\|\,\|d\|},
+  \qquad
+  w(t,x) = (1+\ln tf_{t,x})\,\ln\!\left(\frac{N}{df_t}+1\right).
+  \label{eq:coseno}
+\end{equation}
+El producto $w(t,q)\,w(t,d)$ lo calcula la similitud \texttt{tfidf\_propio} de
+Elasticsearch; el peso TF de la consulta se envía como \emph{boost} de cada
+término y un \texttt{script\_score} divide entre $\|q\|\,\|d\|$. La norma del
+documento $\,\|d\|$ ya está almacenada en el campo \texttt{norma}; la norma de
+la consulta $\|q\|$ se calcula con \texttt{\_mtermvectors} sobre un documento
+artificial, que además entrega el $df$ de cada término~\cite{elasticsearch815}.
+Así la consulta pasa exactamente por el mismo \emph{analyzer} que el documento:
+buscar \textit{director} encuentra \textit{directores}, \textit{cineasta} y
+\textit{filmmaker} cuando el índice agresivo está activo.
+
+La consulta se analiza por campo de idioma y se buscan \texttt{contenido\_es} y
+\texttt{contenido\_en} simultáneamente; el \texttt{script\_score} elige la norma
+$|q|$ según el idioma del documento. Los filtros de dominio e idioma van en
+\texttt{post\_filter}, para que los contadores de la barra lateral sigan
+mostrando todas las opciones de la colección, patrón de navegación facetada
+descrito por Hearst~\cite{hearst2009}.
+
+\subsection{Resultados, fragmentos y enlaces}
+
+Cada resultado muestra título, sitio, idioma, similitud, contadores de
+coincidencias y hasta dos fragmentos. Como el índice no guarda el texto, los
+fragmentos se arman leyendo el \texttt{.txt} del repositorio de la araña y
+pasándolo por \texttt{\_analyze} con el mismo campo del índice: los tokens
+normalizados traen \texttt{start\_offset} y \texttt{end\_offset}, lo que permite
+resaltar la palabra original aunque el término indexado sea una raíz o un
+descriptor del tesauro. Se elige la ventana de 40tokens con más
+coincidencias y se ordena a los fragmentos según su posición en el documento;
+los resaltados son sesgados hacia la consulta, decisión respaldada por
+Tombros y Sanderson~\cite{tombros1998}. Si el archivo no existe, la tarjeta se
+muestra igual y el campo \texttt{texto\_disponible} queda en falso.
+
+El título se deriva de la URL cuando es legible (\texttt{Pulp-Fiction.html}
+$\to$ \emph{Pulp Fiction}) y, si el sitio usa identificadores numéricos, se
+toma la primera línea del guion. El enlace del título apunta a \texttt{url},
+la página original del sitio, nunca al \texttt{.txt}: se abre en otra pestaña
+con \texttt{rel="noopener noreferrer"}. El estado de la búsqueda vive en la URL
+(\texttt{/?q=director\&p=2\&indice=rit\_minimo}), de modo que cualquier consulta
+se puede compartir, recargar y reutilizar como consulta de evaluación.
+
+\begin{lstlisting}[caption={Extracto de la respuesta de \texttt{GET /api/buscar} (contrato de datos).}]
+{
+  "consulta": "director película -remake",
+  "indice": "rit_avanzado",
+  "total": 37,
+  "tiempo_ms": 84,
+  "resultados": [{
+    "rango": 1, "id": "152",
+    "titulo": "Pulp Fiction",
+    "url": "https://imsdb.com/scripts/Pulp-Fiction.html",
+    "similitud": 0.4123,
+    "fragmentos": [ /* piezas con "resaltado": true */ ]
+  }],
+  "facetas": { "idioma": [{"valor": "en", "cantidad": 25}] }
+}
+\end{lstlisting}
+
+La paginación es de diez resultados y el recorrido se limita a los primeros
+\texttt{maximo\_resultados} (1000), valor que también se documenta en el
+contrato. Si el índice se construyó sin posiciones, una consulta con frases
+provoca un aviso y se repite con palabras sueltas: la limitación se hace
+visible en lugar de entregar un resultado engañoso.
+
+% =========================================================
+% SECCIÓN 4: INTERFAZ DE EVALUACIÓN
+% =========================================================
+\section{Interfaz de evaluación de relevancia}
+\label{sec:evaluacion}
+
+La evaluación es un modo independiente del modo de búsqueda. Se parte de una
+dirección ya registrada (\texttt{/?q=\ldots\&indice=\ldots}), se muestran los
+resultados en el mismo orden que produjo el buscador y la persona evaluadora
+asigna un nivel a cada documento. El contrato exige guardar, como mínimo,
+\texttt{consulta}, \texttt{indice}, \texttt{id}, \texttt{relevante},
+\texttt{rango}, \texttt{fecha} y \texttt{evaluador}. Usar \texttt{id} (el
+\texttt{\_id} de Elasticsearch) y no \texttt{doc\_id} es deliberado: el
+primero es estable aunque se reconstruya el índice.
+
+\begin{table}[htbp]
+  \centering
+  \footnotesize
+  \caption{Niveles de relevancia de la escala de tres puntos.}
+  \label{tab:niveles}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}cl@{}}
+    \toprule
+    \textbf{Nivel} & \textbf{Criterio} \\
+    \midrule
+    0 & El documento no aporta a la necesidad de información \\
+    1 & El documento trata el tema y aporta contexto, pero no responde por sí solo \\
+    2 & El documento responde directamente a la consulta (por ejemplo, contiene el guion o el dato pedido) \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+La escala graduada permite calcular tanto métricas binarias (tomando
+\texttt{relevante $\geq 1$} como ``relevante'') como métricas por ganancia
+acumulada, que distinguen un resultado que aporta contexto de uno que responde la
+pregunta~\cite{jarvelin2002}. La escala también hace posible medir el acuerdo
+entre evaluadores con $\kappa$~\cite{cohen1960,landis1977}, siempre que dos
+personas juzguen los mismos documentos.
+
+\textbf{Reclutamiento de evaluadores y estado de los datos.} El repositorio no
+contiene todavía un registro de cómo se convocó a las personas evaluadoras ni
+cuántas participaron; el campo \texttt{evaluador} está previsto en el contrato
+para que, cuando se capturen juicios, quede identificado quién los emitió.
+En la fecha de este informe \texttt{salida/juicios.json} no existe, así que
+\textbf{no se reporta número de evaluadores, cantidad de juicios ni resultado
+de métrica alguna}: la sección~\ref{sec:estadisticas} muestra tablas
+explícitamente vacías. La interfaz queda lista para capturar los juicios y el
+script \texttt{scripts/tablas.py} para resumirlos en cuanto existan.
+
+Los juicios se guardan en \texttt{salida/juicios.json} (o en JSONL) con la
+misma consulta e índice que generó la lista; con el \texttt{rango} registrado
+se pueden recalcular P@k, MRR y nDCG sin volver a pedir resultados a
+Elasticsearch. Conviene que cada participante juzgue las mismas consultas: los
+estudios de Voorhees muestran que los juicios individuales varían, aunque el
+orden relativo de los sistemas suele ser estable~\cite{voorhees2000}; por eso
+la discrepancia se mide con $\kappa$ en lugar de ignorarse.
+
+% =========================================================
+% SECCIÓN 5: MÉTRICAS
+% =========================================================
+\section{Métricas de evaluación}
+\label{sec:metricas}
+
+Se prevén seis métricas: cuatro suficientes para cumplir el mínimo de tres y
+dos complementarias para analizar cobertura y acuerdo. Todas se calculan sobre
+la lista devuelta por la API comparada con los juicios; salvo $\kappa$, se
+promedian sobre el conjunto de consultas $Q$. Ninguna tiene valor numérico en
+este informe porque aún no hay juicios (sección~\ref{sec:evaluacion}).
+
+\subsection{Precisión en los primeros $k$ resultados (P@k)}
+\begin{equation}
+  P@k = \frac{\bigl|\{d \in \mathrm{top}\,k : \mathrm{rel}(d)=1\}\bigr|}{k}.
+\end{equation}
+Mide qué fracción de la primera página es útil, que es lo que la persona ve
+sin paginar~\cite{manning2008}. Con $k=10$, que coincide con
+\texttt{por\_pagina}, responde a la pregunta práctica de si la primera pantalla
+resuelve la necesidad. Su debilidad es que ignora el orden dentro de los diez
+y lo que queda fuera.
+
+\subsection{MAP (precisión media promedio)}
+\begin{equation}
+  \mathrm{AP}(q) = \frac{1}{R_q}\sum_{k=1}^{N} P(k)\,\mathrm{rel}(k),
+  \qquad
+  \mathrm{MAP} = \frac{1}{|Q|}\sum_{q \in Q} \mathrm{AP}(q),
+\end{equation}
+donde $R_q$ es el número de documentos relevantes conocidos y
+$\mathrm{rel}(k)$ vale 1 si el documento en la posición $k$ es relevante. MAP
+resume toda la curva precisión--recall en un número y penaliza que los
+relevantes aparezcan tarde~\cite{manning2008}. Depende de la cobertura de los
+juicios: si no se juzgaron documentos más allá de un cierto rango, $R_q$ está
+subestimado y el valor no es comparable con un conjunto completo.
+
+\subsection{MRR (rango recíproco medio)}
+\begin{equation}
+  \mathrm{MRR} = \frac{1}{|Q|}\sum_{q \in Q}\frac{1}{r_q},
+\end{equation}
+donde $r_q$ es la posición del primer documento relevante (0 si no hay
+ninguno). Es la métrica adecuada cuando la necesidad se satisface con
+\emph{un} documento bueno, por ejemplo localizar un guion concreto; valora que
+el primer acierto suba al primer lugar~\cite{voorhees2000}. Es sensible a un
+solo juicio por consulta, por lo que se reporta junto con P@k y nDCG.
+
+\subsection{nDCG@k (ganancia descontada normalizada)}
+\begin{equation}
+  \mathrm{DCG}@k = \sum_{i=1}^{k}\frac{2^{r_i}-1}{\log_2(i+1)},
+  \qquad
+  \mathrm{nDCG}@k = \frac{\mathrm{DCG}@k}{\mathrm{IDCG}@k},
+\end{equation}
+donde $r_i \in \{0,1,2\}$ es el nivel del documento en la posición $i$ e
+$\mathrm{IDCG}@k$ es la ganancia del orden ideal. Es la métrica central para
+la escala de tres niveles: recompensa que los documentos nivel 2 suban arriba
+y admite comparar consultas con distinto número de relevantes~\cite{jarvelin2002}.
+Se calcula con $k=10$, el tamaño de página del buscador.
+
+\subsection{Recall@k}
+\begin{equation}
+  \mathrm{Recall}@k =
+  \frac{\bigl|\{d \in \mathrm{top}\,k : \mathrm{rel}(d)=1\}\bigr|}
+       {\bigl|\{d : \mathrm{rel}(d)=1\}\bigr|}.
+\end{equation}
+Completa a P@k: mide cuánto de lo relevante conocido aparece en los primeros
+$k$ resultados~\cite{manning2008}. En una colección de 317\,657 documentos los
+juicios son necesariamente parciales, así que el denominador es el conjunto
+juzgado como relevante y no la totalidad de la colección; el valor se interpreta
+como cobertura de la lista evaluada.
+
+\subsection{Coeficiente $\kappa$ de Cohen}
+\begin{equation}
+  \kappa = \frac{p_o - p_e}{1 - p_e},
+  \qquad
+  p_e = \sum_{i=0}^{2} p_i^{(1)}\,p_i^{(2)},
+\end{equation}
+donde $p_o$ es la proporción de acuerdos entre dos evaluadores y $p_e$ la
+proporción esperada por azar, calculada con los marginales de cada uno. Se
+usa para saber si la escala 0/1/2 se aplicó de forma consistente. La
+interpretación de referencia es la de Landis y Koch~\cite{landis1977}: valores
+cerca de 0 indican acuerdo equivalente al azar y valores altos indican acuerdo
+sustancial o casi perfecto. Cohen~\cite{cohen1960} advirtió que $\kappa$ depende
+de los marginales, por lo que se reporta junto con la distribución de niveles
+de la Tabla~\ref{tab:juicios-resumen}. Requiere que dos personas juzguen los
+mismos documentos; si no se cumple, se marca como ``no calculable'' en lugar de
+inventar un valor.
+
+% =========================================================
+% SECCIÓN 6: ESTADÍSTICAS DE USO Y RESULTADOS
+% =========================================================
+\section{Estadísticas de uso y resultados}
+\label{sec:estadisticas}
+
+Las tablas de esta sección no están escritas a mano: las genera
+\texttt{documento/scripts/tablas.py} a partir de \texttt{Progra02/salida/}. El
+script lee \texttt{consultas.jsonl}, \texttt{juicios.json} y, si existen, los
+archivos de métricas; escribe los fragmentos \texttt{.tex} de
+\texttt{documento/tablas/}, que se incluyen con \texttt{\textbackslash input}.
+Para actualizar el informe basta con correr el script y recompilar.
+
+\AlertaDatos{}
+
+\subsection{Registro de uso}
+
+\input{tablas/uso_resumen.tex}
+\input{tablas/consultas_frecuentes.tex}
+\input{tablas/indices_uso.tex}
+
+\InputIfFileExists{tablas/grafico_consultas.tex}{}{%
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \node[draw, rounded corners, fill=softyellow, align=center,
+          minimum width=0.78\linewidth, minimum height=2.8cm,
+          font=\footnotesize]
+      {Sin datos de uso todavía\\
+       El gráfico se genera automáticamente cuando \texttt{salida/consultas.jsonl}\\
+       contenga al menos dos consultas distintas.};
+  \end{tikzpicture}
+  \caption{Espacio reservado para el gráfico de consultas frecuentes.}
+  \label{fig:sin-consultas}
+\end{figure}
+}
+
+\subsection{Juicios y métricas}
+
+\input{tablas/juicios_resumen.tex}
+\input{tablas/metricas_resumen.tex}
+
+\InputIfFileExists{tablas/grafico_metricas.tex}{}{%
+\begin{figure}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \node[draw, rounded corners, fill=softyellow, align=center,
+          minimum width=0.78\linewidth, minimum height=2.8cm,
+          font=\footnotesize]
+      {Sin métricas calculadas todavía\\
+       El gráfico se genera cuando existan juicios y valores de P@k, MAP,\\
+       MRR, nDCG@k o Recall@k en \texttt{salida/}.};
+  \end{tikzpicture}
+  \caption{Espacio reservado para el gráfico de métricas.}
+  \label{fig:sin-metricas}
+\end{figure}
+}
+
+\subsection{Lectura de los resultados}
+
+La interfaz de métricas prevista por el proyecto presenta los valores numéricos
+y sus gráficos en la página web; el informe reproduce los mismos números en la
+Tabla~\ref{tab:metricas-resumen} cuando están disponibles. La discusión debe
+comparar los tres índices con las \emph{mismas} consultas: como la consulta se
+normaliza con el analyzer de cada índice, un cambio en nDCG entre
+\texttt{rit\_minimo} y \texttt{rit\_avanzado} es evidencia del efecto de la
+normalización y no de una diferencia en las personas evaluadoras. Mientras no
+haya juicios, esta sección documenta el procedimiento y deja constancia
+explícita de la ausencia de datos; no presenta cifras estimadas.
+
+% =========================================================
+% SECCIÓN 7: CONCLUSIONES
+% =========================================================
+\section{Conclusiones}
+\label{sec:conclusiones}
+
+\begin{enumerate}[label=\textbf{C\arabic*}.]
+  \item \textbf{La necesidad de información queda atendida en el diseño.} El
+    buscador recorre 317\,657 documentos de nueve sitios audiovisuales y cada
+    resultado enlaza a la página original, no al archivo de texto; así se
+    satisface el primer objetivo de la especificación.
+
+  \item \textbf{El carácter bilingüe del corpus explica decisiones que no son
+    estéticas.} Los campos \texttt{contenido\_es} y \texttt{contenido\_en}, la
+    consulta analizada en ambos idiomas y el tesauro responden a que la
+    colección mezcla español e inglés, a veces en el mismo guion.
+
+  \item \textbf{El ranking es reproducible porque usa la misma fórmula que el
+    índice.} La ecuación~\ref{eq:coseno} se aplica con los pesos TF/IDF de
+    Progra01, $\|d\|$ guardada en el índice y $\|q\|$ calculada con
+    \texttt{\_mtermvectors}; no hay un reordenamiento opaco después de
+    Elasticsearch.
+
+  \item \textbf{Normalizar la consulta con el analyzer del índice evita falsos
+    negativos.} Sin ese paso, \textit{película} no encontraría \textit{film} ni
+    \textit{director} encontraría \textit{realiz}; la interfaz muestra los
+    términos normalizados para que el efecto sea visible.
+
+  \item \textbf{El índice por defecto es una hipótesis, no una verdad medida.}
+    \texttt{rit\_avanzado} se eligió porque es el único que aplica tesauro y
+    plegado de tildes; su superioridad en precisión deberá comprobarse con las
+    mismas consultas evaluadas.
+
+  \item \textbf{Los tres índices son una ventaja experimental.} Poder cambiar
+    entre \texttt{rit\_minimo}, \texttt{rit\_estandar} y \texttt{rit\_avanzado}
+    con la misma consulta convierte a la normalización en una variable
+    controlada y no en una decisión invisible.
+
+  \item \textbf{Los fragmentos resaltan lo que el índice realmente buscó.} Al
+    usar \texttt{\_analyze} con desplazamientos, se marcan variantes como
+    \textit{directores} o \textit{cineasta}; un resaltado literal sería
+    incoherente con el ranking coseno.
+
+  \item \textbf{La elección de fragmentos sesgados hacia la consulta tiene
+    respaldo bibliográfico.} Tombros y Sanderson~\cite{tombros1998} mostraron
+    ventajas de los resúmenes sesgados; aquí se implementa con la ventana de
+    40tokens con más coincidencias y un máximo de dos fragmentos.
+
+  \item \textbf{Leer el texto del repositorio es un compromiso consciente.} El
+    índice se mantiene pequeño porque no almacena el texto; el costo es que la
+    tarjeta depende del \texttt{.txt}, y el código degrada la vista previa sin
+    romper el resultado cuando el archivo falta.
+
+  \item \textbf{El enlace a la página original cumple la restricción explícita
+    del enunciado.} El campo \texttt{url} se abre en otra pestaña y nunca se
+    sustituye por la ruta del \texttt{.txt} del repositorio.
+
+  \item \textbf{Los títulos legibles mejoran el juicio de relevancia.} La
+    función \texttt{tituloDesdeUrl} convierte \texttt{Pulp-Fiction.html} en
+    \emph{Pulp Fiction} y, cuando la URL es un identificador, cae a la primera
+    línea del guion en lugar de mostrar un número.
+
+  \item \textbf{La sintaxis avanzada cubre necesidades de precisión.} Frases,
+    obligatorios, exclusiones y filtros por sitio e idioma permiten pasar de
+    ``todo lo que hable de directores'' a ``guiones de un sitio, en inglés y
+    sin remakes''.
+
+  \item \textbf{Las exclusiones no alteran el puntaje.} \texttt{textoParaPuntaje}
+    incluye libres, obligatorios y frases pero no excluidos, de modo que
+    \texttt{-remake} filtra sin cambiar el orden de los documentos restantes.
+
+  \item \textbf{El estado en la URL hace reproducible la evaluación.} Cada
+    búsqueda tiene una dirección compartible con \texttt{q}, \texttt{p} e
+    \texttt{indice}; esas mismas direcciones alimentan el modo de evaluación.
+
+  \item \textbf{Las limitaciones se hacen visibles.} El tope de 1000
+    resultados y el aviso cuando el índice no guarda posiciones evitan que la
+    persona crea que una frase se verificó exactamente cuando no fue así.
+
+  \item \textbf{El contrato de datos desacopla las tres interfaces.} Con
+    \texttt{id}, \texttt{rango} y \texttt{indice} en la respuesta, evaluación y
+    métricas no necesitan conocer la consulta de Elasticsearch ni los campos
+    del índice.
+
+  \item \textbf{El identificador estable protege los juicios.} Se usa
+    \texttt{id} y no \texttt{doc\_id} porque el primero sobrevive a una
+    reconstrucción del índice; así un juicio sigue apuntando al mismo documento.
+
+  \item \textbf{Las facetas conservan información fuera del filtro.} Al aplicar
+    dominio e idioma en \texttt{post\_filter}, los contadores laterales siguen
+    mostrando las demás opciones, patrón descrito por Hearst~\cite{hearst2009}.
+
+  \item \textbf{El registro de uso está activo pero vacío.} La configuración
+    tiene \texttt{registrar\_consultas = true} y cada búsqueda escribe fecha,
+    consulta, índice, total, tiempo y los \texttt{id} devueltos; al cerrar este
+    informe el archivo no tiene líneas y por eso las Tablas~\ref{tab:uso-resumen}
+    y~\ref{tab:consultas-frecuentes} dicen ``sin datos''.
+
+  \item \textbf{La escala 0/1/2 permite más que un juicio binario.} Al
+    distinguir ``aporta contexto'' de ``responde la pregunta'', nDCG puede
+    penalizar que un resultado nivel 1 desplace a uno nivel 2, algo que una
+    métrica binaria no vería~\cite{jarvelin2002}.
+
+  \item \textbf{El acuerdo entre evaluadores es parte de la calidad del
+    experimento.} $\kappa$~\cite{cohen1960,landis1977} se prevé para medir la
+    consistencia de la escala, con la interpretación de Landis y Koch; no se
+    reporta valor porque no hay dos juegos de juicios sobre los mismos ítems.
+
+  \item \textbf{Se prevén seis métricas, aunque ninguna está calculada.} P@k,
+    MAP, MRR, nDCG@k, Recall@k y $\kappa$ cubren precisión temprana, orden
+    global, primer acierto, ganancia graduada, cobertura y acuerdo; la
+    Tabla~\ref{tab:metricas-resumen} está vacía a la espera de juicios.
+
+  \item \textbf{Los juicios individuales varían, pero el orden de sistemas
+    suele ser estable.} Voorhees~\cite{voorhees2000} observó ese efecto en TREC;
+    por eso conviene promover que cada persona juzgue las mismas consultas y
+    medir la discrepancia en lugar de descartarla.
+
+  \item \textbf{Las pruebas unitarias protegen las piezas que no dependen de
+    Elasticsearch.} \texttt{npm test} verifica el analizador de sintaxis, la
+    comilla sin cerrar, los títulos derivados de URL y el resaltado de
+    fragmentos con un cliente falso.
+
+  \item \textbf{El servidor limita la superficie expuesta.} Sólo acepta GET,
+    rechaza rutas estáticas fuera de \texttt{public/} y responde 400 o 502 con
+    mensajes accionables cuando falta la consulta o Elasticsearch no responde.
+
+  \item \textbf{El informe es regenerable, no transcrito.} Las tablas salen de
+    \texttt{salida/} mediante \texttt{scripts/tablas.py}; cuando la evaluación
+    se ejecute, basta con volver a correr el script y recompilar para que
+    estadísticas, juicios y métricas dejen de estar pendientes.
+
+\end{enumerate}
+
+% =========================================================
+% REFERENCIAS
+% =========================================================
+\begin{thebibliography}{99}
+\setlength{\itemsep}{4pt}
+\bibitem{manning2008} C.~D. Manning, P.~Raghavan y H.~Schütze, \textit{Introduction to Information Retrieval}. Cambridge University Press, 2008. Cap.~6 (modelo vectorial y $tf$-$idf$) y cap.~8 (evaluación y presentación de resultados). \url{https://nlp.stanford.edu/IR-book/}
+\bibitem{salton1988} G.~Salton y C.~Buckley, ``Term-weighting approaches in automatic text retrieval'', \textit{Information Processing \& Management}, vol.~24, n.º~5, pp.~513--523, 1988. \url{https://doi.org/10.1016/0306-4573(88)90021-0}
+\bibitem{hearst2009} M.~Hearst, \textit{Search User Interfaces}. Cambridge University Press, 2009. Cap.~5 (presentación de resultados) y cap.~8 (navegación facetada). \url{https://searchuserinterfaces.com/book/}
+\bibitem{tombros1998} A.~Tombros y M.~Sanderson, ``Advantages of query biased summaries in information retrieval'', en \textit{Proc.\ 21st Annual International ACM SIGIR Conference}, 1998.
+\bibitem{voorhees2000} E.~M. Voorhees, ``Variations in relevance judgments and the measurement of retrieval effectiveness'', \textit{Information Processing \& Management}, vol.~36, n.º~5, pp.~697--716, 2000. \url{https://doi.org/10.1016/S0306-4573(00)00010-8}
+\bibitem{jarvelin2002} K.~Järvelin y J.~Kekäläinen, ``Cumulated gain-based evaluation of IR techniques'', \textit{ACM Transactions on Information Systems}, vol.~20, n.º~4, pp.~422--446, 2002. \url{https://doi.org/10.1145/582415.582418}
+\bibitem{cohen1960} J.~Cohen, ``A coefficient of agreement for nominal scales'', \textit{Educational and Psychological Measurement}, vol.~20, n.º~1, pp.~37--46, 1960. \url{https://doi.org/10.1177/001316446002000104}
+\bibitem{landis1977} J.~R. Landis y G.~G. Koch, ``The measurement of observer agreement for categorical data'', \textit{Biometrics}, vol.~33, n.º~1, pp.~159--174, 1977. \url{https://doi.org/10.2307/2529310}
+\bibitem{elasticsearch815} Elasticsearch, \textit{Reference 8.15}: Script score query, Post filter, Analyze API y Term vectors API. \url{https://www.elastic.co/guide/en/elasticsearch/reference/8.15/index.html}
+\bibitem{porter1980} M.~F. Porter, ``An algorithm for suffix stripping'', \textit{Program}, vol.~14, n.º~3, pp.~130--137, 1980.
+\bibitem{iso25964} ISO, \textit{ISO 25964-1:2011, Information and documentation -- Thesauri and interoperability with other vocabularies -- Part 1: Thesauri for information retrieval}, 2011. \url{https://www.iso.org/standard/53657.html}
+\end{thebibliography}
+
+\end{document}
