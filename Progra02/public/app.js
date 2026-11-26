@@ -88,15 +88,23 @@ function pintarFragmento(fragmento) {
   );
 }
 
-function pintarResultado(r) {
+function pintarResultado(r, estado, indice) {
   const coincidencias = Object.entries(r.coincidencias ?? {})
     .sort((a, b) => b[1] - a[1])
     .map(([t, n]) => `${t} ×${n}`)
     .join(", ");
 
+  const parametrosEvaluacion = new URLSearchParams({ q: estado.q });
+  if (indice) parametrosEvaluacion.set("indice", indice);
+
   return el("li", { class: "resultado" },
     el("h2", { class: "resultado__titulo" },
       el("a", { href: r.url, target: "_blank", rel: "noopener noreferrer" }, r.titulo)),
+    el("a", {
+      class: "resultado__evaluar",
+      href: `/evaluar?${parametrosEvaluacion}`,
+      title: "Reabrir esta búsqueda en modo evaluación",
+    }, "Evaluar este resultado"),
     el("p", { class: "resultado__url" }, r.url),
     r.fragmentos.length
       ? r.fragmentos.map(pintarFragmento)
@@ -244,7 +252,7 @@ async function mostrar() {
     ...pintarResumen(datos),
   );
   lista.setAttribute("start", String((datos.pagina - 1) * datos.por_pagina + 1));
-  lista.replaceChildren(...(datos.resultados.length ? datos.resultados.map(pintarResultado) : [pintarVacio(datos)]));
+  lista.replaceChildren(...(datos.resultados.length ? datos.resultados.map((r) => pintarResultado(r, estado, indice)) : [pintarVacio(datos)]));
   $("filtros").replaceChildren(...pintarFiltros(datos, estado));
   $("paginacion").replaceChildren(...pintarPaginacion(datos, estado));
 }

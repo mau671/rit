@@ -161,9 +161,8 @@ cd Progra00/propio && uv run pytest
 ## Datos y artefactos
 
 Los corpus descargados, bases de datos, bitácoras, resultados e índices **no se
-versionan**; las reglas comunes están en `.gitignore`. El `Progra00.tar.gz` de
-la raíz es el paquete anterior del componente de almacenamiento; el paquete
-completo se genera con el script de abajo.
+versionan**; las reglas comunes están en `.gitignore`. El paquete de entrega se
+genera con el script de abajo.
 
 ## Entrega
 

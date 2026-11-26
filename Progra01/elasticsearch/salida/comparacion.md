@@ -42,4 +42,4 @@ Fases de Elasticsearch (s): carga 78,96, estadísticas 306,28, normas 87,89, com
 
 Fases de Elasticsearch (s): carga 233,83, estadísticas 656,16, normas 232,71, compactación 6,64. Documentos en español: 1097, en inglés: 8903.
 
-> Nota: El neto se corrigió con la instantánea _disk_usage del índice ya reposado (descomposicion_disco.json): store 53151218 - _recovery_source 32958057; la corrida anterior midió exactamente el mismo neto (20193161 bytes). En la corrida del 25-11 la lectura de _recovery_source devolvió 405277 bytes y el store quedó con la copia de recuperación sin descontar. El resto de las métricas es el de esa corrida.
+> Nota: el tamaño neto se toma de la instantánea `_disk_usage` del índice reposado (`descomposicion_disco.json`): `store` menos `_recovery_source`. `_recovery_source` es una copia temporal del documento original que Elasticsearch crea y poda por sí solo, así que no forma parte del índice y su tamaño varía con el tiempo. Por eso la comparación usa el neto y no el tamaño crudo del store.

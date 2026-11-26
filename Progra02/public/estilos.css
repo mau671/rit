@@ -313,6 +313,21 @@ mark {
   .filtros button { width: auto; border: 1px solid var(--linea); }
 }
 
+.resultado__evaluar {
+  align-self: flex-start;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--acento, #b5473a);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 0.1rem;
+}
+
+.resultado__evaluar:hover,
+.resultado__evaluar:focus-visible {
+  color: var(--texto, inherit);
+}
+
 @media (max-width: 560px) {
   .busqueda { flex-wrap: wrap; }
   .busqueda input { flex-basis: 100%; }
