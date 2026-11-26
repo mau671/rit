@@ -6,7 +6,7 @@ y para la discusión de resultados.
 ## Qué hace
 
 Encuadre es la interfaz web del motor de búsqueda sobre la colección que
-recorrió la araña (Progra00) y que indexó Progra01-ES. Permite:
+recorrió la araña (Progra00) y que indexó Progra01/elasticsearch. Permite:
 
 1. Buscar con el modelo vectorial (similitud coseno con pesos TF/IDF).
 2. Usar búsqueda avanzada: frases exactas, palabras obligatorias, exclusiones
@@ -53,7 +53,7 @@ del buscador, sino una vista distinta sobre la misma búsqueda y sus resultados.
 ## Decisiones
 
 **El ranking usa la misma fórmula que el índice.** La similitud
-`tfidf_propio` definida en Progra01-ES calcula `w(t,q)·w(t,d)` por término; el
+`tfidf_propio` definida en Progra01/elasticsearch calcula `w(t,q)·w(t,d)` por término; el
 buscador pone el peso TF de la consulta como *boost* de cada término y divide
 el total entre `|q|·|d|` con `script_score` (`|d|` está guardada en el campo
 `norma`). El resultado es la similitud coseno del modelo vectorial, entre 0 y 1

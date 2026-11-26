@@ -1,5 +1,5 @@
 // busqueda.js
-// Motor de búsqueda sobre los índices de Progra01-ES.
+// Motor de búsqueda sobre los índices de Progra01/elasticsearch.
 //
 // Ranking: modelo vectorial con similitud coseno, la misma fórmula del índice
 //   similitud(q,d) = Σ w(t,q)·w(t,d) / (|q|·|d|)

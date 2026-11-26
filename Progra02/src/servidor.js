@@ -65,7 +65,7 @@ function enviarHtml(res, estado, html) {
 }
 
 function mensajeDeError(err) {
-  if (err?.meta?.statusCode === 404) return "El índice no existe. Construilo primero con Progra01-ES.";
+  if (err?.meta?.statusCode === 404) return "El índice no existe. Construilo primero con Progra01/elasticsearch.";
   if (err?.name === "ConnectionError") return "No hay conexión con Elasticsearch. Revisá que esté corriendo (docker compose up -d).";
   return err?.meta?.body?.error?.reason ?? err.message;
 }

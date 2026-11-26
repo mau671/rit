@@ -2,7 +2,7 @@
 
 Interfaz de búsqueda y resultados del Proyecto 3 (IC-8060 Recuperación de
 Información Textual, TEC). Busca sobre los índices de Elasticsearch que
-construye `Progra01-ES` y enlaza a las páginas originales.
+construye `Progra01/elasticsearch` y enlaza a las páginas originales.
 
 - Descripción y decisiones de diseño: [`docs/buscador.md`](docs/buscador.md)
 - Formato de la API para las interfaces de evaluación y métricas: [`docs/contrato-api.md`](docs/contrato-api.md)
@@ -29,13 +29,13 @@ Va en la raíz del repositorio, al lado de la araña:
 ```
 rit/
 ├── Progra00/almacenamiento/repositorio/
-├── Progra01/Progra01-ES/      (construye los índices)
+├── Progra01/elasticsearch/      (construye los índices)
 └── Progra02/                  (este proyecto)
 ```
 
 ## Uso
 
-1. Elasticsearch corriendo y los índices construidos (desde `Progra01/Progra01-ES`):
+1. Elasticsearch corriendo y los índices construidos (desde `Progra01/elasticsearch`):
 
    ```bash
    docker compose up -d --build
@@ -85,9 +85,9 @@ Si no, las palabras se buscan sueltas y la página lo avisa.
 ## Problemas comunes
 
 - **"No hay conexión con Elasticsearch"**: levantarlo con
-  `docker compose up -d` desde `Progra01/Progra01-ES`.
+  `docker compose up -d` desde `Progra01/elasticsearch`.
 - **"El índice no existe"** o un índice aparece como "no construido":
   construirlo con `node src/cli.js indexar -c configuraciones/<politica>.conf`
-  en `Progra01-ES`.
+  en `Progra01/elasticsearch`.
 - **Resultados sin vista previa**: la ruta de `repositorio` en
   `buscador.conf` no apunta a la carpeta de la araña.
